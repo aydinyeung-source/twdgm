@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Crown Clash</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ── LOADING ─────────────────────────────────────────── -->
+  <div id="screen-loading" class="screen active">
+    <div class="loading-inner">
+      <div class="crown-logo">♛</div>
+      <h1 class="logo-text">CROWN CLASH</h1>
+      <div class="loading-bar-wrap"><div id="loading-bar"></div></div>
+      <p class="loading-label">Loading…</p>
+    </div>
+  </div>
+
+  <!-- ── AUTH ───────────────────────────────────────────── -->
+  <div id="screen-auth" class="screen">
+    <div class="auth-backdrop"></div>
+    <div class="auth-card">
+      <div class="crown-logo small">♛</div>
+      <h1 class="logo-text small">CROWN CLASH</h1>
+
+      <div class="auth-tabs">
+        <button class="tab-btn active" data-tab="login">Login</button>
+        <button class="tab-btn" data-tab="register">Register</button>
+      </div>
+
+      <div id="auth-login" class="auth-form active">
+        <input type="text"     id="login-username" placeholder="Username"  autocomplete="username">
+        <input type="password" id="login-password" placeholder="Password"  autocomplete="current-password">
+        <button id="btn-login" class="btn-action">PLAY</button>
+      </div>
+
+      <div id="auth-register" class="auth-form">
+        <input type="text"     id="reg-username"  placeholder="Username">
+        <input type="password" id="reg-password"  placeholder="Password (min 6)">
+        <input type="password" id="reg-confirm"   placeholder="Confirm Password">
+        <button id="btn-register" class="btn-action">CREATE ACCOUNT</button>
+      </div>
+
+      <p id="auth-error" class="auth-error"></p>
+    </div>
+  </div>
+
+  <!-- ── MAIN MENU ───────────────────────────────────────── -->
+  <div id="screen-menu" class="screen">
+    <div class="menu-bg"></div>
+    <div class="menu-layout">
+
+      <header class="menu-header">
+        <div class="profile-pill">
+          <div class="avatar-wrap">
+            <div id="menu-avatar" class="avatar"></div>
+            <div class="avatar-ring"></div>
+          </div>
+          <div class="profile-info">
+            <span id="menu-username" class="profile-name">Player</span>
+            <span id="menu-trophies" class="trophy-label">🏆 <span id="trophy-val">0</span></span>
+          </div>
+          <button id="btn-settings" class="icon-btn" title="Settings">⚙</button>
+        </div>
+
+        <div class="stats-strip">
+          <div class="stat-box">
+            <span id="menu-wins"   class="stat-val">0</span>
+            <span class="stat-lbl">Wins</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-box">
+            <span id="menu-losses" class="stat-val">0</span>
+            <span class="stat-lbl">Losses</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-box">
+            <span id="menu-wr"     class="stat-val">—</span>
+            <span class="stat-lbl">Win Rate</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="menu-main">
+        <button id="btn-battle" class="btn-battle">
+          <span class="battle-sword">⚔</span>
+          <span class="battle-label">BATTLE</span>
+          <span class="battle-sub">1v1 · Online</span>
+        </button>
+      </main>
+
+      <nav class="menu-nav">
+        <button class="nav-item active">
+          <span class="nav-icon">🏠</span>
+          <span>Home</span>
+        </button>
+        <button class="nav-item" id="btn-logout">
+          <span class="nav-icon">🚪</span>
+          <span>Logout</span>
+        </button>
+      </nav>
+
+    </div>
+  </div>
+
+  <!-- ── MATCHMAKING ─────────────────────────────────────── -->
+  <div id="screen-matchmaking" class="screen">
+    <div class="mm-inner">
+      <div class="search-ring-wrap">
+        <div class="search-ring"></div>
+        <div class="search-ring delay1"></div>
+        <span class="search-icon">⚔</span>
+      </div>
+      <p class="mm-label">Finding opponent…</p>
+      <p id="mm-timer" class="mm-timer">0:00</p>
+      <button id="btn-cancel-match" class="btn-ghost">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ── GAME ────────────────────────────────────────────── -->
+  <div id="screen-game" class="screen">
+    <div id="game-wrap">
+      <canvas id="game-canvas"></canvas>
+    </div>
+
+    <!-- HUD bar fixed below canvas -->
+    <div id="game-hud">
+      <div id="hud-elixir">
+        <div id="elixir-bar-track">
+          <div id="elixir-bar-fill"></div>
+          <div id="elixir-pips">
+            <span class="epip" data-n="1"></span>
+            <span class="epip" data-n="2"></span>
+            <span class="epip" data-n="3"></span>
+            <span class="epip" data-n="4"></span>
+            <span class="epip" data-n="5"></span>
+            <span class="epip" data-n="6"></span>
+            <span class="epip" data-n="7"></span>
+            <span class="epip" data-n="8"></span>
+            <span class="epip" data-n="9"></span>
+            <span class="epip" data-n="10"></span>
+          </div>
+        </div>
+        <span id="elixir-num" class="elixir-num">0</span>
+      </div>
+
+      <div id="hud-hand">
+        <div id="next-card" class="next-card-slot" title="Next card">
+          <div id="next-card-cost" class="nc-cost"></div>
+          <div id="next-card-body" class="nc-body"></div>
+        </div>
+        <div id="card-hand"></div>
+      </div>
+    </div>
+
+    <div id="deploy-hint" class="deploy-hint hidden">
+      Tap your half to deploy
+    </div>
+  </div>
+
+  <!-- ── RESULT ──────────────────────────────────────────── -->
+  <div id="screen-result" class="screen">
+    <div class="result-bg"></div>
+    <div class="result-card">
+      <div id="result-icon" class="result-icon"></div>
+      <h2 id="result-title" class="result-title"></h2>
+      <div id="result-crowns" class="result-crowns"></div>
+
+      <div class="result-stats">
+        <div class="rs-row">
+          <span class="rs-lbl">Units deployed</span>
+          <span id="rs-units" class="rs-val"></span>
+        </div>
+        <div class="rs-row">
+          <span class="rs-lbl">Damage dealt</span>
+          <span id="rs-dmg" class="rs-val"></span>
+        </div>
+        <div class="rs-row">
+          <span class="rs-lbl">Towers taken</span>
+          <span id="rs-towers" class="rs-val"></span>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button id="btn-result-battle" class="btn-action">Battle Again</button>
+        <button id="btn-result-menu"   class="btn-ghost">Home</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/game.js"></script>
+</body>
+</html>
