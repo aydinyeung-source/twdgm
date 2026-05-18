@@ -13,7 +13,6 @@ export class Account {
   }
 
   isLoggedIn() {
-    if (DEV_MODE) return true;
     return !!(this.token && this.user);
   }
 

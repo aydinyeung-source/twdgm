@@ -53,7 +53,7 @@ class Game {
       } else {
         this.ui.show('auth');
       }
-    }, 1800);
+    }, 600);
 
     window.addEventListener('resize', () => this._resize());
     this._resize();
