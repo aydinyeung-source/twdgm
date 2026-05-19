@@ -70,7 +70,7 @@
     <div class="menu-bg"></div>
     <div class="menu-layout">
 
-      <!-- Always-visible topbar: coin count -->
+      <!-- Always-visible topbar -->
       <div class="menu-topbar">
         <div class="topbar-coin">
           <svg viewBox="0 0 20 20" width="16" height="16">
@@ -79,6 +79,12 @@
           </svg>
           <span id="coin-count">0</span>
         </div>
+        <button id="btn-friends" class="topbar-friends-btn" title="Friends">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor">
+            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+          </svg>
+          <span id="friends-badge" class="friends-badge hidden">!</span>
+        </button>
       </div>
 
       <!-- Tab content area -->
@@ -98,19 +104,49 @@
                   <svg viewBox="0 0 16 16" width="13" height="13" fill="#f5c518"><path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 1.9.7-4L2.2 5.2l4-.6z"/></svg>
                   <span id="trophy-val">0</span>
                 </span>
+                <span id="menu-player-tag" class="player-tag-label">#------</span>
               </div>
             </div>
 
+            <!-- Arena display -->
+            <div id="arena-display" class="arena-display">
+              <div class="arena-icon-wrap">
+                <svg viewBox="0 0 80 80" width="56" height="56" fill="none">
+                  <ellipse cx="40" cy="64" rx="34" ry="10" fill="rgba(0,0,0,0.35)"/>
+                  <rect x="12" y="18" width="56" height="42" rx="6" fill="#1a3a5c" stroke="#2d8bcc" stroke-width="1.5"/>
+                  <rect x="12" y="18" width="56" height="12" rx="3" fill="#2d5a8c"/>
+                  <rect x="16" y="34" width="8" height="20" rx="2" fill="#1e4a7a"/>
+                  <rect x="56" y="34" width="8" height="20" rx="2" fill="#1e4a7a"/>
+                  <rect x="28" y="28" width="24" height="26" rx="3" fill="#0f2942"/>
+                  <rect x="32" y="22" width="4" height="8" rx="1" fill="#f5c518" opacity="0.7"/>
+                  <rect x="44" y="22" width="4" height="8" rx="1" fill="#f5c518" opacity="0.7"/>
+                </svg>
+              </div>
+              <div class="arena-info">
+                <div id="arena-name" class="arena-name">Training Grounds</div>
+                <div id="arena-range" class="arena-range">0 – 249 trophies</div>
+              </div>
+              <button id="btn-arena-tiers" class="arena-tiers-btn" title="View all arenas">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M6 10l4-4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+              </button>
+            </div>
+
             <button id="btn-battle" class="btn-battle">
-              <svg viewBox="0 0 40 40" width="38" height="38" fill="none">
-                <line x1="8" y1="32" x2="32" y2="8" stroke="white" stroke-width="3" stroke-linecap="round"/>
-                <line x1="28" y1="4" x2="36" y2="12" stroke="white" stroke-width="3" stroke-linecap="round"/>
-                <line x1="14" y1="26" x2="4" y2="36" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+              <svg viewBox="0 0 40 40" width="42" height="42" fill="none">
+                <line x1="8" y1="32" x2="32" y2="8" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+                <line x1="28" y1="4" x2="36" y2="12" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+                <line x1="14" y1="26" x2="4" y2="36" stroke="white" stroke-width="3" stroke-linecap="round"/>
                 <line x1="12" y1="20" x2="20" y2="12" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
               </svg>
               <span class="battle-label">BATTLE</span>
               <span class="battle-sub">1v1 · Online</span>
             </button>
+
+            <button id="btn-modes" class="btn-modes">⚡ Mode: <span id="modes-current">Normal</span></button>
+
+            <div id="battle-deck-warning" class="battle-deck-warning hidden">
+              ⚠ Build a 12-card deck first (6 enemies + 6 troops)
+            </div>
           </div>
         </div>
 
@@ -123,15 +159,16 @@
                 <div class="avatar-ring"></div>
               </div>
               <div id="profile-username" class="profile-username-lg">Player</div>
+              <div id="profile-tag" class="profile-tag-lg">#------</div>
             </div>
             <div class="profile-stats-grid">
               <div class="pstat-box gold">
                 <span id="pstat-trophies" class="pstat-val">0</span>
                 <span class="pstat-lbl">Trophies</span>
               </div>
-              <div class="pstat-box">
+              <div class="pstat-box pstat-arena-box" id="pstat-arena-box" style="cursor:pointer" title="View arena tiers">
                 <span id="pstat-arena" class="pstat-val">Training</span>
-                <span class="pstat-lbl">Arena</span>
+                <span class="pstat-lbl">Arena ▾</span>
               </div>
               <div class="pstat-box green">
                 <span id="pstat-wins" class="pstat-val">0</span>
@@ -145,9 +182,15 @@
                 <span id="pstat-games" class="pstat-val">0</span>
                 <span class="pstat-lbl">Games</span>
               </div>
-              <div class="pstat-box blue">
+              <div class="pstat-box blue pstat-wr-box" id="pstat-wr-box" style="cursor:pointer" title="Change time period">
                 <span id="pstat-wr" class="pstat-val">--</span>
-                <span class="pstat-lbl">Win Rate</span>
+                <span class="pstat-lbl">Win Rate ▾</span>
+                <div id="wr-dropdown" class="wr-dropdown hidden">
+                  <button class="wr-opt active" data-period="all">All Time</button>
+                  <button class="wr-opt" data-period="month">This Month</button>
+                  <button class="wr-opt" data-period="week">This Week</button>
+                  <button class="wr-opt" data-period="today">Today</button>
+                </div>
               </div>
             </div>
           </div>
@@ -195,16 +238,8 @@
 
       </div>
 
-      <!-- Bottom tab navigation -->
+      <!-- Bottom tab navigation: Battle in centre -->
       <nav class="menu-tabs">
-        <button class="menu-tab active" data-tab="battle">
-          <svg viewBox="0 0 40 40" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-            <line x1="8" y1="32" x2="32" y2="8"/>
-            <line x1="28" y1="4" x2="36" y2="12"/>
-            <line x1="14" y1="26" x2="4" y2="36"/>
-          </svg>
-          <span>Battle</span>
-        </button>
         <button class="menu-tab" data-tab="profile">
           <svg viewBox="0 0 20 20" width="22" height="22" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
           <span>Profile</span>
@@ -212,6 +247,14 @@
         <button class="menu-tab" data-tab="deck">
           <svg viewBox="0 0 20 20" width="22" height="22" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/></svg>
           <span>Deck</span>
+        </button>
+        <button class="menu-tab active battle-tab" data-tab="battle">
+          <svg viewBox="0 0 40 40" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="8" y1="32" x2="32" y2="8"/>
+            <line x1="28" y1="4" x2="36" y2="12"/>
+            <line x1="14" y1="26" x2="4" y2="36"/>
+          </svg>
+          <span>Battle</span>
         </button>
         <button class="menu-tab" data-tab="shop">
           <svg viewBox="0 0 20 20" width="22" height="22" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/></svg>
@@ -267,6 +310,21 @@
             <span class="epip" data-n="8"></span>
             <span class="epip" data-n="9"></span>
             <span class="epip" data-n="10"></span>
+            <span class="epip" data-n="11"></span>
+            <span class="epip" data-n="12"></span>
+            <span class="epip" data-n="13"></span>
+            <span class="epip" data-n="14"></span>
+            <span class="epip" data-n="15"></span>
+            <span class="epip" data-n="16"></span>
+            <span class="epip" data-n="17"></span>
+            <span class="epip" data-n="18"></span>
+            <span class="epip" data-n="19"></span>
+            <span class="epip" data-n="20"></span>
+            <span class="epip" data-n="21"></span>
+            <span class="epip" data-n="22"></span>
+            <span class="epip" data-n="23"></span>
+            <span class="epip" data-n="24"></span>
+            <span class="epip" data-n="25"></span>
           </div>
         </div>
         <span id="elixir-num" class="elixir-num">0</span>
@@ -313,6 +371,101 @@
         <button id="btn-result-battle" class="btn-action">Battle Again</button>
         <button id="btn-result-menu"   class="btn-ghost">Home</button>
       </div>
+    </div>
+  </div>
+
+  <!-- CARD DETAIL MODAL -->
+  <div id="card-modal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="card-modal-backdrop"></div>
+    <div class="card-modal-inner">
+      <button id="modal-close" class="modal-close-btn">&times;</button>
+      <div id="modal-art" class="modal-art"></div>
+      <div class="modal-header-info">
+        <div id="modal-name" class="modal-card-name"></div>
+        <div class="modal-badges">
+          <span id="modal-type-badge" class="modal-type-badge"></span>
+          <span id="modal-race-badge" class="modal-race-badge"></span>
+          <span id="modal-rarity-badge" class="modal-rarity-badge"></span>
+        </div>
+      </div>
+      <div class="modal-level-row">
+        <span id="modal-level-lbl" class="modal-level-lbl">Level 1</span>
+        <div id="modal-copies-bar" class="modal-copies-bar">
+          <div id="modal-copies-fill" class="modal-copies-fill"></div>
+        </div>
+        <span id="modal-copies-lbl" class="modal-copies-lbl">0/2</span>
+      </div>
+      <div id="modal-stats" class="modal-stats"></div>
+      <div id="modal-desc" class="modal-desc"></div>
+      <div id="modal-counter-row" class="modal-counter-row"></div>
+      <div class="modal-actions">
+        <button id="modal-equip-btn" class="modal-equip-btn">Equip</button>
+        <button id="modal-upgrade-btn" class="modal-upgrade-btn">Upgrade</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARENA TIERS MODAL -->
+  <div id="arena-modal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="arena-modal-backdrop"></div>
+    <div class="arena-modal-inner">
+      <button id="arena-modal-close" class="modal-close-btn">&times;</button>
+      <h3 class="modal-title">Arena Tiers</h3>
+      <div id="arena-tiers-list" class="arena-tiers-list"></div>
+    </div>
+  </div>
+
+  <!-- COIN MODES MODAL -->
+  <div id="modes-modal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="modes-modal-backdrop"></div>
+    <div class="modes-modal-inner">
+      <button id="modes-modal-close" class="modal-close-btn">&times;</button>
+      <h3 class="modal-title">Coin Modes</h3>
+      <p class="modes-desc">Multiply coins earned per match</p>
+      <div class="modes-grid">
+        <button class="mode-btn active" data-mult="1">Normal</button>
+        <button class="mode-btn" data-mult="2">2× Coins</button>
+        <button class="mode-btn" data-mult="3">3× Coins</button>
+        <button class="mode-btn" data-mult="5">5× Coins</button>
+        <button class="mode-btn" data-mult="10">10× Coins</button>
+        <button class="mode-btn mode-inf" data-mult="inf">∞ Infinite Coins</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FRIENDS PANEL -->
+  <div id="friends-panel" class="friends-panel hidden">
+    <div class="friends-panel-header">
+      <span>Friends</span>
+      <button id="friends-panel-close" class="modal-close-btn">&times;</button>
+    </div>
+
+    <!-- Pending requests banner -->
+    <div id="pending-requests-banner" class="pending-requests-banner hidden">
+      <span id="pending-requests-count"></span>
+      <button id="btn-view-requests" class="wr-opt">View</button>
+    </div>
+
+    <!-- Add friend -->
+    <div class="friends-add-row">
+      <input id="friend-tag-input" type="text" placeholder="Player tag (e.g. #ABC123)" class="friend-tag-input"/>
+      <button id="btn-send-friend" class="friend-add-btn">Add</button>
+    </div>
+    <p id="friend-add-msg" class="friend-add-msg"></p>
+
+    <!-- Requests tab / Friends list tab -->
+    <div class="friends-tabs">
+      <button class="friends-tab-btn active" data-ftab="list">Friends (<span id="friends-count">0</span>)</button>
+      <button class="friends-tab-btn" data-ftab="requests">Requests (<span id="requests-count">0</span>)</button>
+    </div>
+
+    <div id="friends-list-panel" class="friends-list">
+      <p class="friends-empty" id="friends-empty-msg">No friends yet. Add some!</p>
+      <div id="friends-list-items"></div>
+    </div>
+    <div id="friends-requests-panel" class="friends-list hidden">
+      <p class="friends-empty" id="requests-empty-msg">No pending requests.</p>
+      <div id="requests-list-items"></div>
     </div>
   </div>
 

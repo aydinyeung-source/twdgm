@@ -49,6 +49,13 @@ const UNIT_STYLE = {
   farm:         { body: '#92400e', rim: '#fcd34d', shape: 'square' },
   tank:         { body: '#1e3a8a', rim: '#60a5fa', shape: 'hexagon' },
   sniper:       { body: '#0f766e', rim: '#5eead4', shape: 'triangle' },
+  wasp:         { body: '#84cc16', rim: '#a3e635', shape: 'triangle' },
+  phantom:      { body: '#6366f1', rim: '#818cf8', shape: 'circle'   },
+  archer:       { body: '#64748b', rim: '#94a3b8', shape: 'diamond'  },
+  aegis:        { body: '#0d9488', rim: '#14b8a6', shape: 'hexagon'  },
+  wall:         { body: '#64748b', rim: '#94a3b8', shape: 'square'   },
+  cannon:       { body: '#334155', rim: '#64748b', shape: 'square'   },
+  bombhouse:    { body: '#78350f', rim: '#f59e0b', shape: 'square'   },
 };
 
 export class Renderer {
@@ -369,6 +376,20 @@ export class Renderer {
     const hpColor = u.owner === 'ply' ? PAL.hpBluePly : PAL.hpRedOpp;
     _hpBar(ctx, u.x - u.r, u.y - u.r - 9, u.r * 2, 4, u.hp / u.maxHp, hpColor);
 
+    // Flying indicator (small wing shape above unit)
+    if (u.flying) {
+      ctx.save();
+      ctx.fillStyle = '#a3e635';
+      ctx.globalAlpha = cloaked ? 0.15 : 0.8;
+      const wx = u.x, wy = u.y - u.r - 13, ws = 5;
+      ctx.beginPath();
+      ctx.moveTo(wx, wy); ctx.lineTo(wx - ws*1.4, wy + ws*0.8);
+      ctx.lineTo(wx - ws*0.5, wy + ws*0.2); ctx.lineTo(wx, wy + ws*1.2);
+      ctx.lineTo(wx + ws*0.5, wy + ws*0.2); ctx.lineTo(wx + ws*1.4, wy + ws*0.8);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
     // Stun flash
     if (u.stunTimer > 0) {
       ctx.save();
@@ -610,10 +631,31 @@ function _drawUnitDetail(ctx, defId, x, y, s, color) {
       ctx.quadraticCurveTo(x, y+s*0.7, x-s, y);
       ctx.stroke();
       ctx.beginPath(); ctx.arc(x, y, s*0.28, 0, Math.PI*2); ctx.fill(); break;
-    case 'tank': // shield + star
+    case 'tank':
+      ctx.beginPath(); ctx.arc(x, y, s*0.55, 0, Math.PI*2); ctx.stroke(); break;
+    case 'wasp': // 3 tiny circles (drone formation)
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 - Math.PI / 2;
+        ctx.beginPath(); ctx.arc(x + Math.cos(a)*s*0.55, y + Math.sin(a)*s*0.55, s*0.22, 0, Math.PI*2); ctx.fill();
+      } break;
+    case 'phantom': // wings outline
       ctx.beginPath();
-      ctx.arc(x, y, s*0.55, 0, Math.PI*2);
+      ctx.moveTo(x, y); ctx.lineTo(x - s, y - s*0.5);
+      ctx.moveTo(x, y); ctx.lineTo(x + s, y - s*0.5);
       ctx.stroke(); break;
+    case 'archer': // arrow pointing up (anti-air)
+      ctx.beginPath();
+      ctx.moveTo(x, y - s); ctx.lineTo(x - s*0.5, y + s*0.3);
+      ctx.lineTo(x, y); ctx.lineTo(x + s*0.5, y + s*0.3);
+      ctx.closePath(); ctx.fill(); break;
+    case 'aegis': // upward burst lines
+      for (let i = 0; i < 4; i++) {
+        const a = -Math.PI/2 + (i - 1.5) * (Math.PI / 4);
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(a)*s*0.3, y + Math.sin(a)*s*0.3);
+        ctx.lineTo(x + Math.cos(a)*s, y + Math.sin(a)*s);
+        ctx.stroke();
+      } break;
     default:
       ctx.beginPath();
       ctx.arc(x, y, s*0.35, 0, Math.PI*2);

@@ -20,13 +20,15 @@ export class Deck {
 
 // ── Card Hand ──────────────────────────────────────────────
 export class Hand {
-  constructor(economy, deckCardIds, onPlay) {
-    this.economy  = economy;
-    this.onPlay   = onPlay;
-    this.cards    = [];
-    this.nextId   = null;
-    this.selected = -1;
-    this._deck    = new Deck(deckCardIds);
+  constructor(economy, deckCardIds, onPlay, opts = {}) {
+    this.economy   = economy;
+    this.onPlay    = onPlay;
+    this.cards     = [];
+    this.nextId    = null;
+    this.selected  = -1;
+    this._deck     = new Deck(deckCardIds);
+    this._getLevel = opts.getLevel ?? null;
+    this._onCardInfo = opts.onCardInfo ?? null;
   }
 
   deal() {
@@ -59,8 +61,7 @@ export class Hand {
     return this.selected >= 0 ? CARD_DEFS[this.cards[this.selected]] : null;
   }
 
-  // Called when player taps a deploy zone
-  tryDeploy(lane) {
+  tryDeploy(lane, target = null) {
     if (this.selected < 0) return false;
     const def = CARD_DEFS[this.cards[this.selected]];
     if (!this.economy.spend(def.cost)) return false;
@@ -71,7 +72,7 @@ export class Hand {
     this.nextId = this._deck.peek();
     this.selected = -1;
     this._render();
-    this.onPlay(playedId, lane);
+    this.onPlay(playedId, lane, target);
     return true;
   }
 
@@ -81,8 +82,10 @@ export class Hand {
     container.innerHTML = '';
 
     this.cards.forEach((id, i) => {
-      const def = CARD_DEFS[id];
-      const el  = document.createElement('div');
+      const def   = CARD_DEFS[id];
+      const level = this._getLevel ? this._getLevel(id) : 1;
+      const el    = document.createElement('div');
+      const typeBadge = def.type === 'enemy' ? 'ATK' : def.type === 'spell' ? 'SPELL' : 'DEF';
       el.className = [
         'card',
         `type-${def.type}`,
@@ -94,12 +97,13 @@ export class Hand {
       el.style.setProperty('--race-color', raceColor);
       el.innerHTML = `
         <div class="card-cost">${def.cost}</div>
-        <div class="card-type-badge">${def.type}</div>
+        <div class="card-type-badge">${typeBadge}</div>
+        ${level > 1 ? `<div class="card-level-badge">Lv${level}</div>` : ''}
         <div class="card-icon"></div>
         <div class="card-name">${def.name}</div>
         <div class="card-race">${RACE_DEFS[def.race]?.name ?? ''}</div>
       `;
-      el.querySelector('.card-icon').appendChild(cardThumbCanvas(id, 40));
+      el.querySelector('.card-icon').appendChild(cardThumbCanvas(id, 44));
       el.addEventListener('click', () => this.select(i));
       container.appendChild(el);
     });
@@ -110,7 +114,7 @@ export class Hand {
       const costEl = document.getElementById('next-card-cost');
       const bodyEl = document.getElementById('next-card-body');
       if (costEl) costEl.textContent = nd.cost;
-      if (bodyEl) { bodyEl.innerHTML = ''; bodyEl.appendChild(cardThumbCanvas(nd.id, 32)); }
+      if (bodyEl) { bodyEl.innerHTML = ''; bodyEl.appendChild(cardThumbCanvas(this.nextId, 32)); }
     }
   }
 
