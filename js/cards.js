@@ -1,4 +1,4 @@
-import { CARD_DEFS, ALL_CARD_IDS, HAND_SIZE } from './data.js';
+import { CARD_DEFS, ALL_CARD_IDS, HAND_SIZE, RACE_DEFS } from './data.js';
 import { cardThumbCanvas } from './cardart.js';
 
 // ── Deck (rotating cycle) ──────────────────────────────────
@@ -90,11 +90,14 @@ export class Hand {
         !this.economy.canAfford(def.cost) ? 'unaffordable' : '',
       ].filter(Boolean).join(' ');
       el.style.setProperty('--card-bg', _hexToRgba(def.color, 0.12));
+      const raceColor = RACE_DEFS[def.race]?.color ?? '#888';
+      el.style.setProperty('--race-color', raceColor);
       el.innerHTML = `
         <div class="card-cost">${def.cost}</div>
         <div class="card-type-badge">${def.type}</div>
         <div class="card-icon"></div>
         <div class="card-name">${def.name}</div>
+        <div class="card-race">${RACE_DEFS[def.race]?.name ?? ''}</div>
       `;
       el.querySelector('.card-icon').appendChild(cardThumbCanvas(id, 40));
       el.addEventListener('click', () => this.select(i));

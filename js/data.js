@@ -67,6 +67,14 @@ export const CHEST_DEFS = [
   },
 ];
 
+// ── Race definitions ───────────────────────────────────────
+export const RACE_DEFS = {
+  gremlin: { name: 'GREMLIN', color: '#f59e0b', desc: 'Chaotic, impulsive creatures that live to cause mayhem.' },
+  shade:   { name: 'SHADE',   color: '#a855f7', desc: 'Dark spectral entities from beyond the veil.' },
+  iron:    { name: 'IRON',    color: '#60a5fa', desc: 'Disciplined human soldiers, forged for war.' },
+  vorn:    { name: 'VORN',    color: '#22d3ee', desc: 'Ancient biomechanical constructs of unknown origin.' },
+};
+
 // ── Card definitions ───────────────────────────────────────
 // type 'enemy'  → deploy in opponent's arena
 // type 'troop'  → deploy in your own arena
@@ -78,7 +86,7 @@ export const CARD_DEFS = {
 
   speeder: {
     id: 'speeder', name: 'DART', type: 'enemy', cost: 2,
-    rarity: 'common', arenaUnlock: 0,
+    rarity: 'common', arenaUnlock: 0, race: 'gremlin',
     hp: 32,  speed: 290, dmg: 6,  rate: 900,  r: 18,
     color: '#f97316', glow: '#fb923c',
     desc: 'Blazing fast & cheap. Hard to intercept.',
@@ -88,7 +96,7 @@ export const CARD_DEFS = {
 
   swarmer: {
     id: 'swarmer', name: 'GREMLIN', type: 'enemy', cost: 2,
-    rarity: 'common', arenaUnlock: 0,
+    rarity: 'common', arenaUnlock: 0, race: 'gremlin',
     hp: 18,  speed: 160, dmg: 4,  rate: 800,  r: 14,
     color: '#eab308', glow: '#facc15',
     desc: 'Spawns 3 at once. Overwhelm them.',
@@ -98,7 +106,7 @@ export const CARD_DEFS = {
 
   brute: {
     id: 'brute', name: 'GOLIATH', type: 'enemy', cost: 5,
-    rarity: 'epic', arenaUnlock: 3,
+    rarity: 'epic', arenaUnlock: 3, race: 'shade',
     hp: 220, speed: 58,  dmg: 22, rate: 1500, r: 34,
     color: '#8b5cf6', glow: '#a78bfa',
     desc: 'Massive tank. Hard to stop.',
@@ -108,7 +116,7 @@ export const CARD_DEFS = {
 
   berserker: {
     id: 'berserker', name: 'FURY', type: 'enemy', cost: 4,
-    rarity: 'rare', arenaUnlock: 0,
+    rarity: 'rare', arenaUnlock: 0, race: 'shade',
     hp: 44,  speed: 240, dmg: 38, rate: 1100, r: 21,
     color: '#ef4444', glow: '#f87171',
     desc: 'Fragile but deals enormous damage.',
@@ -118,7 +126,7 @@ export const CARD_DEFS = {
 
   kamikaze: {
     id: 'kamikaze', name: 'BOMBER', type: 'enemy', cost: 3,
-    rarity: 'epic', arenaUnlock: 2,
+    rarity: 'epic', arenaUnlock: 2, race: 'gremlin',
     hp: 55,  speed: 185, dmg: 0,  rate: 9999, r: 21,
     color: '#f59e0b', glow: '#fbbf24',
     desc: 'Explodes on contact. Stuns nearby troops.',
@@ -128,7 +136,7 @@ export const CARD_DEFS = {
 
   shadow: {
     id: 'shadow', name: 'WRAITH', type: 'enemy', cost: 5,
-    rarity: 'rare', arenaUnlock: 1,
+    rarity: 'rare', arenaUnlock: 1, race: 'shade',
     hp: 72,  speed: 195, dmg: 16, rate: 1000, r: 21,
     color: '#475569', glow: '#64748b',
     desc: 'Invisible for 3 sec after spawning.',
@@ -140,7 +148,7 @@ export const CARD_DEFS = {
 
   grunt: {
     id: 'grunt', name: 'LANCER', type: 'troop', cost: 2,
-    rarity: 'common', arenaUnlock: 0,
+    rarity: 'common', arenaUnlock: 0, race: 'iron',
     hp: 55,  speed: 100, dmg: 9,  rate: 1000, r: 22,
     color: '#3b82f6', glow: '#60a5fa',
     desc: 'Solid all-rounder.',
@@ -150,7 +158,7 @@ export const CARD_DEFS = {
 
   splasher: {
     id: 'splasher', name: 'TORRENT', type: 'troop', cost: 3,
-    rarity: 'common', arenaUnlock: 0,
+    rarity: 'common', arenaUnlock: 0, race: 'vorn',
     hp: 42,  speed: 82,  dmg: 6,  rate: 1200, r: 22,
     color: '#06b6d4', glow: '#22d3ee',
     desc: 'AOE splash damage on attack.',
@@ -160,7 +168,7 @@ export const CARD_DEFS = {
 
   spawner: {
     id: 'spawner', name: 'HIVE', type: 'troop', cost: 5,
-    rarity: 'epic', arenaUnlock: 3,
+    rarity: 'epic', arenaUnlock: 3, race: 'vorn',
     hp: 85,  speed: 52,  dmg: 5,  rate: 1400, r: 27,
     color: '#2563eb', glow: '#3b82f6',
     desc: 'Periodically spawns Lancer minions.',
@@ -170,7 +178,7 @@ export const CARD_DEFS = {
 
   shield_bearer: {
     id: 'shield_bearer', name: 'VANGUARD', type: 'troop', cost: 4,
-    rarity: 'rare', arenaUnlock: 0,
+    rarity: 'rare', arenaUnlock: 0, race: 'iron',
     hp: 125, speed: 68,  dmg: 7,  rate: 1300, r: 28,
     color: '#1d4ed8', glow: '#3b82f6',
     desc: 'Reduces damage taken by nearby allies.',
@@ -180,7 +188,7 @@ export const CARD_DEFS = {
 
   healer: {
     id: 'healer', name: 'MENDER', type: 'troop', cost: 4,
-    rarity: 'rare', arenaUnlock: 0,
+    rarity: 'rare', arenaUnlock: 0, race: 'vorn',
     hp: 62,  speed: 78,  dmg: 3,  rate: 2000, r: 22,
     color: '#10b981', glow: '#34d399',
     desc: 'Heals nearby allies over time.',
@@ -190,7 +198,7 @@ export const CARD_DEFS = {
 
   booster: {
     id: 'booster', name: 'AMP', type: 'troop', cost: 4,
-    rarity: 'epic', arenaUnlock: 2,
+    rarity: 'epic', arenaUnlock: 2, race: 'gremlin',
     hp: 52,  speed: 78,  dmg: 4,  rate: 1200, r: 22,
     color: '#f59e0b', glow: '#fbbf24',
     desc: 'Boosts damage & speed of nearby allies.',
@@ -200,7 +208,7 @@ export const CARD_DEFS = {
 
   farm: {
     id: 'farm', name: 'SIPHON', type: 'troop', cost: 5,
-    rarity: 'epic', arenaUnlock: 4,
+    rarity: 'epic', arenaUnlock: 4, race: 'vorn',
     hp: 72,  speed: 0,   dmg: 0,  rate: 9999, r: 27,
     color: '#d97706', glow: '#f59e0b',
     desc: 'Stationary. Generates +1 elixir every 3 sec.',
@@ -210,7 +218,7 @@ export const CARD_DEFS = {
 
   tank: {
     id: 'tank', name: 'FORTRESS', type: 'troop', cost: 5,
-    rarity: 'rare', arenaUnlock: 1,
+    rarity: 'rare', arenaUnlock: 1, race: 'iron',
     hp: 260, speed: 42,  dmg: 16, rate: 1500, r: 34,
     color: '#1e3a8a', glow: '#2563eb',
     desc: 'Extremely tough frontliner.',
@@ -220,7 +228,7 @@ export const CARD_DEFS = {
 
   sniper: {
     id: 'sniper', name: 'PIERCER', type: 'troop', cost: 4,
-    rarity: 'rare', arenaUnlock: 0,
+    rarity: 'rare', arenaUnlock: 0, race: 'iron',
     hp: 48,  speed: 62,  dmg: 28, rate: 2000, r: 20,
     color: '#0f766e', glow: '#14b8a6',
     desc: 'Long range. High single-target damage.',

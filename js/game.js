@@ -1,5 +1,5 @@
 import { DEV_MODE }               from './config.js';
-import { CARD_DEFS, MATCH_DURATION, CW, CHEST_DEFS, STARTER_DECK } from './data.js';
+import { CARD_DEFS, MATCH_DURATION, CW, CHEST_DEFS, STARTER_DECK, RACE_DEFS } from './data.js';
 import { cardThumbCanvas } from './cardart.js';
 import { GameLoop, Particles, dist } from './engine.js';
 import { Unit, Tower, Projectile, buildTowers } from './entities.js';
@@ -221,11 +221,13 @@ class Game {
         const isInDeck   = this._editDeck.has(id);
         const el = document.createElement('div');
         el.className = ['coll-card', `rarity-${def.rarity}`, isInDeck ? 'in-deck' : '', !isUnlocked ? 'locked' : ''].filter(Boolean).join(' ');
+        const raceCol = RACE_DEFS[def.race]?.color ?? '#888';
+        el.style.setProperty('--race-color', raceCol);
         el.innerHTML = `
           <div class="cc-cost">${def.cost}</div>
           <div class="cc-icon"></div>
           <div class="cc-name">${def.name}</div>
-          <div class="cc-rarity">${def.rarity}</div>
+          <div class="cc-race">${RACE_DEFS[def.race]?.name ?? ''}</div>
           ${!isUnlocked ? '<div class="cc-lock">&#128274;</div>' : ''}
           ${isInDeck    ? '<div class="cc-check">&#10003;</div>' : ''}
         `;
@@ -310,11 +312,13 @@ class Game {
         const canAfford = (u.coins ?? 0) >= item.price;
         const el = document.createElement('div');
         el.className = ['shop-card', `rarity-${item.def.rarity}`, item.owned ? 'owned' : '', item.bought ? 'bought' : ''].filter(Boolean).join(' ');
+        const scRaceCol = RACE_DEFS[item.def.race]?.color ?? '#888';
+        el.style.setProperty('--race-color', scRaceCol);
         el.innerHTML = `
           <div class="sc-cost">${item.def.cost}</div>
           <div class="sc-icon"></div>
           <div class="sc-name">${item.def.name}</div>
-          <div class="sc-rarity">${item.def.rarity}</div>
+          <div class="sc-race">${RACE_DEFS[item.def.race]?.name ?? ''}</div>
           ${item.bought ? '<div class="sc-status">Bought</div>' :
             item.owned  ? '<div class="sc-status owned-lbl">Owned</div>' :
             `<button class="sc-buy-btn ${canAfford ? '' : 'no-coins'}">C ${item.price}</button>`}
