@@ -2,14 +2,14 @@ import { CARD_DEFS, ALL_CARD_IDS, HAND_SIZE } from './data.js';
 
 // ── Deck (rotating cycle) ──────────────────────────────────
 export class Deck {
-  constructor() {
+  constructor(cardIds) {
+    this._source = cardIds && cardIds.length >= 4 ? cardIds : ALL_CARD_IDS;
     this.cycle = [];
     this.reset();
   }
 
   reset() {
-    // Shuffle all card IDs into a cycle
-    this.cycle = [...ALL_CARD_IDS].sort(() => Math.random() - 0.5);
+    this.cycle = [...this._source].sort(() => Math.random() - 0.5);
     this._pos = 0;
   }
 
@@ -19,13 +19,13 @@ export class Deck {
 
 // ── Card Hand ──────────────────────────────────────────────
 export class Hand {
-  constructor(economy, onPlay) {
+  constructor(economy, deckCardIds, onPlay) {
     this.economy  = economy;
-    this.onPlay   = onPlay;   // (cardId, lane) => void
-    this.cards    = [];       // array of cardId strings
+    this.onPlay   = onPlay;
+    this.cards    = [];
     this.nextId   = null;
     this.selected = -1;
-    this._deck    = new Deck();
+    this._deck    = new Deck(deckCardIds);
   }
 
   deal() {

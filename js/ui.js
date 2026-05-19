@@ -48,13 +48,7 @@ export class UI {
     const setT = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     setT('menu-username', user.username);
     setT('trophy-val',    user.trophies ?? 0);
-    setT('menu-wins',     user.wins     ?? 0);
-    setT('menu-losses',   user.losses   ?? 0);
-    const wr = user.wins + user.losses > 0
-      ? Math.round((user.wins / (user.wins + user.losses)) * 100) + '%'
-      : '—';
-    setT('menu-wr', wr);
-
+    setT('coin-count',    user.coins    ?? 0);
     const av = document.getElementById('menu-avatar');
     if (av) av.textContent = (user.username?.[0] ?? '?').toUpperCase();
   }

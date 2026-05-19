@@ -10,7 +10,7 @@
 </head>
 <body>
 
-  <!-- ── LOADING ─────────────────────────────────────────── -->
+  <!-- LOADING -->
   <div id="screen-loading" class="screen active">
     <div class="loading-inner">
       <svg class="logo-mark" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -25,11 +25,11 @@
       </svg>
       <h1 class="logo-text">TWD<span class="accent">GM</span></h1>
       <div class="loading-bar-wrap"><div id="loading-bar"></div></div>
-      <p class="loading-label">Loading…</p>
+      <p class="loading-label">Loading...</p>
     </div>
   </div>
 
-  <!-- ── AUTH ───────────────────────────────────────────── -->
+  <!-- AUTH -->
   <div id="screen-auth" class="screen">
     <div class="auth-backdrop"></div>
     <div class="auth-card">
@@ -65,72 +65,168 @@
     </div>
   </div>
 
-  <!-- ── MAIN MENU ───────────────────────────────────────── -->
+  <!-- MAIN MENU -->
   <div id="screen-menu" class="screen">
     <div class="menu-bg"></div>
     <div class="menu-layout">
 
-      <header class="menu-header">
-        <div class="profile-pill">
-          <div class="avatar-wrap">
-            <div id="menu-avatar" class="avatar"></div>
-            <div class="avatar-ring"></div>
-          </div>
-          <div class="profile-info">
-            <span id="menu-username" class="profile-name">Player</span>
-            <span id="menu-trophies" class="trophy-label"><svg class="trophy-svg" viewBox="0 0 16 16" width="13" height="13" fill="#f5c518"><path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 1.9.7-4L2.2 5.2l4-.6z"/></svg> <span id="trophy-val">0</span></span>
-          </div>
-          <button id="btn-settings" class="icon-btn" title="Settings">
-            <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
-          </button>
-        </div>
-
-        <div class="stats-strip">
-          <div class="stat-box">
-            <span id="menu-wins"   class="stat-val">0</span>
-            <span class="stat-lbl">Wins</span>
-          </div>
-          <div class="stat-divider"></div>
-          <div class="stat-box">
-            <span id="menu-losses" class="stat-val">0</span>
-            <span class="stat-lbl">Losses</span>
-          </div>
-          <div class="stat-divider"></div>
-          <div class="stat-box">
-            <span id="menu-wr"     class="stat-val">—</span>
-            <span class="stat-lbl">Win Rate</span>
-          </div>
-        </div>
-      </header>
-
-      <main class="menu-main">
-        <button id="btn-battle" class="btn-battle">
-          <svg class="battle-sword-svg" viewBox="0 0 40 40" width="38" height="38" fill="none">
-            <line x1="8" y1="32" x2="32" y2="8" stroke="white" stroke-width="3" stroke-linecap="round"/>
-            <line x1="28" y1="4" x2="36" y2="12" stroke="white" stroke-width="3" stroke-linecap="round"/>
-            <line x1="14" y1="26" x2="4" y2="36" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="12" y1="20" x2="20" y2="12" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+      <!-- Always-visible topbar: coin count -->
+      <div class="menu-topbar">
+        <div class="topbar-coin">
+          <svg viewBox="0 0 20 20" width="16" height="16">
+            <circle cx="10" cy="10" r="9" fill="#f5c518" stroke="#d97706" stroke-width="1.5"/>
+            <text x="10" y="14" text-anchor="middle" font-size="9" font-weight="900" fill="#7c2d12" font-family="sans-serif">C</text>
           </svg>
-          <span class="battle-label">BATTLE</span>
-          <span class="battle-sub">1v1 · Online</span>
-        </button>
-      </main>
+          <span id="coin-count">0</span>
+        </div>
+      </div>
 
-      <nav class="menu-nav">
-        <button class="nav-item active">
-          <svg viewBox="0 0 20 20" width="22" height="22" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4a1 1 0 001-1v-4h2v4a1 1 0 001 1h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
-          <span>Home</span>
+      <!-- Tab content area -->
+      <div class="tab-panels">
+
+        <!-- Battle -->
+        <div id="tab-battle" class="tab-panel active">
+          <div class="battle-panel">
+            <div class="profile-mini">
+              <div class="avatar-wrap">
+                <div id="menu-avatar" class="avatar"></div>
+                <div class="avatar-ring"></div>
+              </div>
+              <div class="profile-info">
+                <span id="menu-username" class="profile-name">Player</span>
+                <span id="menu-trophies" class="trophy-label">
+                  <svg viewBox="0 0 16 16" width="13" height="13" fill="#f5c518"><path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 1.9.7-4L2.2 5.2l4-.6z"/></svg>
+                  <span id="trophy-val">0</span>
+                </span>
+              </div>
+            </div>
+
+            <button id="btn-battle" class="btn-battle">
+              <svg viewBox="0 0 40 40" width="38" height="38" fill="none">
+                <line x1="8" y1="32" x2="32" y2="8" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                <line x1="28" y1="4" x2="36" y2="12" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                <line x1="14" y1="26" x2="4" y2="36" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="12" y1="20" x2="20" y2="12" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+              </svg>
+              <span class="battle-label">BATTLE</span>
+              <span class="battle-sub">1v1 · Online</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Profile -->
+        <div id="tab-profile" class="tab-panel">
+          <div class="profile-panel">
+            <div class="profile-avatar-lg">
+              <div class="avatar-wrap">
+                <div id="profile-avatar" class="avatar lg"></div>
+                <div class="avatar-ring"></div>
+              </div>
+              <div id="profile-username" class="profile-username-lg">Player</div>
+            </div>
+            <div class="profile-stats-grid">
+              <div class="pstat-box gold">
+                <span id="pstat-trophies" class="pstat-val">0</span>
+                <span class="pstat-lbl">Trophies</span>
+              </div>
+              <div class="pstat-box">
+                <span id="pstat-arena" class="pstat-val">Training</span>
+                <span class="pstat-lbl">Arena</span>
+              </div>
+              <div class="pstat-box green">
+                <span id="pstat-wins" class="pstat-val">0</span>
+                <span class="pstat-lbl">Wins</span>
+              </div>
+              <div class="pstat-box red">
+                <span id="pstat-losses" class="pstat-val">0</span>
+                <span class="pstat-lbl">Losses</span>
+              </div>
+              <div class="pstat-box">
+                <span id="pstat-games" class="pstat-val">0</span>
+                <span class="pstat-lbl">Games</span>
+              </div>
+              <div class="pstat-box blue">
+                <span id="pstat-wr" class="pstat-val">--</span>
+                <span class="pstat-lbl">Win Rate</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Deck -->
+        <div id="tab-deck" class="tab-panel">
+          <div class="deck-panel">
+            <div class="panel-header">
+              <h3>Your Deck</h3>
+              <span id="deck-count" class="deck-count-badge">0/8</span>
+            </div>
+            <div id="deck-slots" class="deck-slots-grid"></div>
+            <div class="panel-header" style="margin-top:6px">
+              <h3>All Cards</h3>
+            </div>
+            <div id="card-collection" class="card-collection-grid"></div>
+            <button id="btn-save-deck" class="btn-action" disabled>Save Deck</button>
+          </div>
+        </div>
+
+        <!-- Shop -->
+        <div id="tab-shop" class="tab-panel">
+          <div class="shop-panel">
+            <div class="panel-header">
+              <h3>Arena Chests</h3>
+            </div>
+            <div id="chest-grid" class="chest-grid"></div>
+            <div class="panel-header">
+              <h3>Daily Shop</h3>
+              <span id="daily-timer" class="daily-timer"></span>
+            </div>
+            <div id="daily-shop-grid" class="daily-shop-grid"></div>
+          </div>
+        </div>
+
+        <!-- Settings -->
+        <div id="tab-settings" class="tab-panel">
+          <div class="settings-panel">
+            <div class="settings-section">
+              <button id="btn-logout" class="btn-ghost danger-btn">Log Out</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Bottom tab navigation -->
+      <nav class="menu-tabs">
+        <button class="menu-tab active" data-tab="battle">
+          <svg viewBox="0 0 40 40" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="8" y1="32" x2="32" y2="8"/>
+            <line x1="28" y1="4" x2="36" y2="12"/>
+            <line x1="14" y1="26" x2="4" y2="36"/>
+          </svg>
+          <span>Battle</span>
         </button>
-        <button class="nav-item" id="btn-logout">
-          <svg viewBox="0 0 20 20" width="22" height="22" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/></svg>
-          <span>Logout</span>
+        <button class="menu-tab" data-tab="profile">
+          <svg viewBox="0 0 20 20" width="22" height="22" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+          <span>Profile</span>
+        </button>
+        <button class="menu-tab" data-tab="deck">
+          <svg viewBox="0 0 20 20" width="22" height="22" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/></svg>
+          <span>Deck</span>
+        </button>
+        <button class="menu-tab" data-tab="shop">
+          <svg viewBox="0 0 20 20" width="22" height="22" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/></svg>
+          <span>Shop</span>
+        </button>
+        <button class="menu-tab" data-tab="settings">
+          <svg viewBox="0 0 20 20" width="22" height="22" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+          <span>More</span>
         </button>
       </nav>
 
     </div>
   </div>
 
-  <!-- ── MATCHMAKING ─────────────────────────────────────── -->
+  <!-- MATCHMAKING -->
   <div id="screen-matchmaking" class="screen">
     <div class="mm-inner">
       <div class="search-ring-wrap">
@@ -143,13 +239,13 @@
           <line x1="6"  y1="44" x2="8"  y2="34" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
         </svg>
       </div>
-      <p class="mm-label">Finding opponent…</p>
+      <p class="mm-label">Finding opponent...</p>
       <p id="mm-timer" class="mm-timer">0:00</p>
       <button id="btn-cancel-match" class="btn-ghost">Cancel</button>
     </div>
   </div>
 
-  <!-- ── GAME ────────────────────────────────────────────── -->
+  <!-- GAME -->
   <div id="screen-game" class="screen">
     <div id="game-wrap">
       <canvas id="game-canvas"></canvas>
@@ -190,7 +286,7 @@
     </div>
   </div>
 
-  <!-- ── RESULT ──────────────────────────────────────────── -->
+  <!-- RESULT -->
   <div id="screen-result" class="screen">
     <div class="result-bg"></div>
     <div class="result-card">

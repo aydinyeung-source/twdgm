@@ -1,5 +1,5 @@
 import { DEV_MODE }               from './config.js';
-import { CARD_DEFS, MATCH_DURATION, CW } from './data.js';
+import { CARD_DEFS, MATCH_DURATION, CW, CHEST_DEFS, STARTER_DECK } from './data.js';
 import { GameLoop, Particles, dist } from './engine.js';
 import { Unit, Tower, Projectile, buildTowers } from './entities.js';
 import { Economy }                  from './economy.js';
@@ -44,12 +44,13 @@ class Game {
     this._wireResultUI();
     this._wireCanvasDeploy();
 
+    this._editDeck = null;
+
     // Show loading → then real initial screen
     this.ui.show('loading');
     setTimeout(() => {
       if (this.account.isLoggedIn()) {
-        this.ui.updateProfile(this.account.getUser());
-        this.ui.show('menu');
+        this._showMenu();
       } else {
         this.ui.show('auth');
       }
@@ -81,9 +82,8 @@ class Game {
     const pass = document.getElementById('login-password')?.value;
     if (!user || !pass) { this.ui.setAuthError('Fill in all fields.'); return; }
     try {
-      const u = await this.account.login(user, pass);
-      this.ui.updateProfile(u);
-      this.ui.show('menu');
+      await this.account.login(user, pass);
+      this._showMenu();
     } catch (e) { this.ui.setAuthError(e.message); }
   }
 
@@ -95,19 +95,223 @@ class Game {
     if (pass.length < 6)  { this.ui.setAuthError('Password must be 6+ characters.'); return; }
     if (pass !== confirm) { this.ui.setAuthError('Passwords do not match.'); return; }
     try {
-      const u = await this.account.register(user, pass);
-      this.ui.updateProfile(u);
-      this.ui.show('menu');
+      await this.account.register(user, pass);
+      this._showMenu();
     } catch (e) { this.ui.setAuthError(e.message); }
   }
 
   // ── Menu ──────────────────────────────────────────────────
+  _showMenu() {
+    const u = this.account.getUser();
+    if (u) this.ui.updateProfile(u);
+    this._updateCoinDisplay();
+    // Reset to battle tab
+    document.querySelectorAll('.menu-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'battle'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-battle'));
+    this.ui.show('menu');
+  }
+
   _wireMenuUI() {
+    // Tab switching
+    document.querySelectorAll('.menu-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.menu-tab').forEach(b => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+        if (tab === 'profile') this._renderProfileTab();
+        if (tab === 'deck')    this._renderDeckTab();
+        if (tab === 'shop')    this._renderShopTab();
+      });
+    });
+
     document.getElementById('btn-battle')?.addEventListener('click', () => this._startMatchmaking());
     document.getElementById('btn-logout')?.addEventListener('click', () => {
       this.account.logout();
       this.ui.show('auth');
     });
+    document.getElementById('btn-save-deck')?.addEventListener('click', () => this._saveDeck());
+  }
+
+  _updateCoinDisplay() {
+    const u = this.account.getUser();
+    const el = document.getElementById('coin-count');
+    if (el) el.textContent = u?.coins ?? 0;
+  }
+
+  _renderProfileTab() {
+    const u = this.account.getUser();
+    if (!u) return;
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('profile-username', u.username);
+    set('pstat-trophies', u.trophies ?? 0);
+    set('pstat-wins',     u.wins ?? 0);
+    set('pstat-losses',   u.losses ?? 0);
+    set('pstat-games',    (u.wins ?? 0) + (u.losses ?? 0));
+    const wr = (u.wins + u.losses) > 0
+      ? Math.round((u.wins / (u.wins + u.losses)) * 100) + '%' : '--';
+    set('pstat-wr', wr);
+    const t = u.trophies ?? 0;
+    const arena = t < 250 ? 'Training' : t < 500 ? 'Arena 1' : t < 750 ? 'Arena 2' : t < 1000 ? 'Arena 3' : 'Arena 4+';
+    set('pstat-arena', arena);
+    const av = document.getElementById('profile-avatar');
+    if (av) av.textContent = (u.username?.[0] ?? '?').toUpperCase();
+  }
+
+  _renderDeckTab() {
+    const u = this.account.getUser();
+    if (!u) return;
+    const unlocked = new Set(u.unlockedCards ?? []);
+    this._editDeck = new Set(u.deck ?? STARTER_DECK);
+    this._redrawDeckTab(unlocked);
+  }
+
+  _redrawDeckTab(unlocked) {
+    const deckCountEl = document.getElementById('deck-count');
+    const saveBtn     = document.getElementById('btn-save-deck');
+    if (deckCountEl) deckCountEl.textContent = `${this._editDeck.size}/8`;
+    if (saveBtn) saveBtn.disabled = this._editDeck.size !== 8;
+
+    // Deck slots
+    const slotsEl = document.getElementById('deck-slots');
+    if (slotsEl) {
+      slotsEl.innerHTML = '';
+      const deckArr = [...this._editDeck];
+      for (let i = 0; i < 8; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'deck-slot';
+        if (deckArr[i]) {
+          const def = CARD_DEFS[deckArr[i]];
+          const cardId = deckArr[i];
+          slot.classList.add('filled');
+          slot.innerHTML = `<div class="dc-icon">${def.icon}</div><div class="dc-name">${def.name}</div>`;
+          slot.addEventListener('click', () => {
+            this._editDeck.delete(cardId);
+            this._redrawDeckTab(unlocked);
+          });
+        } else {
+          slot.innerHTML = `<div class="dc-empty">+</div>`;
+        }
+        slotsEl.appendChild(slot);
+      }
+    }
+
+    // Collection grid
+    const collEl = document.getElementById('card-collection');
+    if (collEl) {
+      collEl.innerHTML = '';
+      for (const [id, def] of Object.entries(CARD_DEFS)) {
+        const isUnlocked = unlocked.has(id);
+        const isInDeck   = this._editDeck.has(id);
+        const el = document.createElement('div');
+        el.className = ['coll-card', `rarity-${def.rarity}`, isInDeck ? 'in-deck' : '', !isUnlocked ? 'locked' : ''].filter(Boolean).join(' ');
+        el.innerHTML = `
+          <div class="cc-cost">${def.cost}</div>
+          <div class="cc-icon">${def.icon}</div>
+          <div class="cc-name">${def.name}</div>
+          <div class="cc-rarity">${def.rarity}</div>
+          ${!isUnlocked ? '<div class="cc-lock">&#128274;</div>' : ''}
+          ${isInDeck    ? '<div class="cc-check">&#10003;</div>' : ''}
+        `;
+        if (isUnlocked) {
+          el.addEventListener('click', () => {
+            if (this._editDeck.has(id)) {
+              this._editDeck.delete(id);
+            } else if (this._editDeck.size < 8) {
+              this._editDeck.add(id);
+            }
+            this._redrawDeckTab(unlocked);
+          });
+        }
+        collEl.appendChild(el);
+      }
+    }
+  }
+
+  _saveDeck() {
+    if (!this._editDeck || this._editDeck.size !== 8) return;
+    this.account.saveDeck([...this._editDeck]);
+    const btn = document.getElementById('btn-save-deck');
+    if (btn) {
+      btn.textContent = 'Saved!';
+      setTimeout(() => { btn.textContent = 'Save Deck'; }, 1500);
+    }
+  }
+
+  _renderShopTab() {
+    const u = this.account.getUser();
+    if (!u) return;
+    this._updateCoinDisplay();
+
+    // Daily timer
+    const now = new Date(), midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    const ms = midnight - now;
+    const h  = Math.floor(ms / 3600000);
+    const m  = Math.floor((ms % 3600000) / 60000);
+    const timerEl = document.getElementById('daily-timer');
+    if (timerEl) timerEl.textContent = `Resets in ${h}h ${m}m`;
+
+    // Chests
+    const chestGrid = document.getElementById('chest-grid');
+    if (chestGrid) {
+      chestGrid.innerHTML = '';
+      for (const chest of CHEST_DEFS) {
+        const canAfford = (u.coins ?? 0) >= chest.cost;
+        const el = document.createElement('div');
+        el.className = 'chest-card';
+        el.innerHTML = `
+          <div class="chest-icon">&#127873;</div>
+          <div class="chest-name">${chest.name}</div>
+          <div class="chest-slots">${chest.slots.map(r => `<span class="rarity-dot rarity-${r[0]}">${r[0][0].toUpperCase()}</span>`).join('')}</div>
+          <button class="chest-buy-btn ${canAfford ? '' : 'disabled'}">C ${chest.cost}</button>
+        `;
+        el.querySelector('.chest-buy-btn')?.addEventListener('click', () => {
+          if (!canAfford) return;
+          const result = this.account.openChest(chest.id);
+          if (result.ok) {
+            this._showChestResult(result.results);
+            this._renderShopTab();
+          }
+        });
+        chestGrid.appendChild(el);
+      }
+    }
+
+    // Daily shop
+    const dailyGrid = document.getElementById('daily-shop-grid');
+    if (dailyGrid) {
+      dailyGrid.innerHTML = '';
+      for (const item of this.account.getDailyShop()) {
+        const canAfford = (u.coins ?? 0) >= item.price;
+        const el = document.createElement('div');
+        el.className = ['shop-card', `rarity-${item.def.rarity}`, item.owned ? 'owned' : '', item.bought ? 'bought' : ''].filter(Boolean).join(' ');
+        el.innerHTML = `
+          <div class="sc-cost">${item.def.cost}</div>
+          <div class="sc-icon">${item.def.icon}</div>
+          <div class="sc-name">${item.def.name}</div>
+          <div class="sc-rarity">${item.def.rarity}</div>
+          ${item.bought ? '<div class="sc-status">Bought</div>' :
+            item.owned  ? '<div class="sc-status owned-lbl">Owned</div>' :
+            `<button class="sc-buy-btn ${canAfford ? '' : 'no-coins'}">C ${item.price}</button>`}
+        `;
+        el.querySelector('.sc-buy-btn')?.addEventListener('click', () => {
+          if (!canAfford) return;
+          const result = this.account.buyShopCard(item.id);
+          if (result.ok) { this._updateCoinDisplay(); this._renderShopTab(); }
+        });
+        dailyGrid.appendChild(el);
+      }
+    }
+  }
+
+  _showChestResult(results) {
+    const cards = results.filter(r => r.type === 'card').map(r => CARD_DEFS[r.id]?.name).filter(Boolean).join(', ');
+    const coins = results.filter(r => r.type === 'coins').reduce((a, r) => a + r.amount, 0);
+    let msg = '';
+    if (cards) msg += `Cards unlocked: ${cards}`;
+    if (coins) msg += (msg ? '\n' : '') + `Coin refund: ${coins}`;
+    if (!msg)  msg = 'No new cards to unlock.';
+    setTimeout(() => alert(msg), 50);
   }
 
   _startMatchmaking() {
@@ -155,7 +359,8 @@ class Game {
     this.economy.reset();
     this.economy.onChange = () => this.hand?.updateAffordability();
 
-    this.hand = new Hand(this.economy, (cardId, lane) => {
+    const deckIds = this.account.getUser()?.deck ?? STARTER_DECK;
+    this.hand = new Hand(this.economy, deckIds, (cardId, lane) => {
       this._spawnUnit(cardId, 'ply', lane);
       this.net?.deploy(cardId, lane);
       this.state.stats.units++;
@@ -168,7 +373,7 @@ class Game {
     this.loop.start();
   }
 
-  _endGame(won) {
+  async _endGame(won) {
     this._active = false;
     this.loop.stop();
 
@@ -178,7 +383,8 @@ class Game {
     const oppTowersDead = Object.values(this.state.towers)
       .filter(t => t.owner === 'opp' && t.dead).length;
 
-    this.account.updateStats(won);
+    await this.account.updateStats(won);
+    this._updateCoinDisplay();
     this.ui.updateProfile(this.account.getUser());
     this.ui.showResult({
       won,
@@ -193,7 +399,7 @@ class Game {
   // ── Result ────────────────────────────────────────────────
   _wireResultUI() {
     document.getElementById('btn-result-battle')?.addEventListener('click', () => this._startMatchmaking());
-    document.getElementById('btn-result-menu')?.addEventListener('click',   () => this.ui.show('menu'));
+    document.getElementById('btn-result-menu')?.addEventListener('click',   () => this._showMenu());
   }
 
   // ── Network events ────────────────────────────────────────
