@@ -1,4 +1,5 @@
 import { CARD_DEFS, ALL_CARD_IDS, HAND_SIZE } from './data.js';
+import { cardThumbCanvas } from './cardart.js';
 
 // ── Deck (rotating cycle) ──────────────────────────────────
 export class Deck {
@@ -92,9 +93,10 @@ export class Hand {
       el.innerHTML = `
         <div class="card-cost">${def.cost}</div>
         <div class="card-type-badge">${def.type}</div>
-        <div class="card-icon">${def.icon}</div>
+        <div class="card-icon"></div>
         <div class="card-name">${def.name}</div>
       `;
+      el.querySelector('.card-icon').appendChild(cardThumbCanvas(id, 40));
       el.addEventListener('click', () => this.select(i));
       container.appendChild(el);
     });
@@ -105,7 +107,7 @@ export class Hand {
       const costEl = document.getElementById('next-card-cost');
       const bodyEl = document.getElementById('next-card-body');
       if (costEl) costEl.textContent = nd.cost;
-      if (bodyEl) bodyEl.innerHTML   = `<span>${nd.icon}</span>`;
+      if (bodyEl) { bodyEl.innerHTML = ''; bodyEl.appendChild(cardThumbCanvas(nd.id, 32)); }
     }
   }
 

@@ -1,5 +1,6 @@
 import { DEV_MODE }               from './config.js';
 import { CARD_DEFS, MATCH_DURATION, CW, CHEST_DEFS, STARTER_DECK } from './data.js';
+import { cardThumbCanvas } from './cardart.js';
 import { GameLoop, Particles, dist } from './engine.js';
 import { Unit, Tower, Projectile, buildTowers } from './entities.js';
 import { Economy }                  from './economy.js';
@@ -183,7 +184,8 @@ class Game {
           const def = CARD_DEFS[deckArr[i]];
           const cardId = deckArr[i];
           slot.classList.add('filled');
-          slot.innerHTML = `<div class="dc-icon">${def.icon}</div><div class="dc-name">${def.name}</div>`;
+          slot.innerHTML = `<div class="dc-icon"></div><div class="dc-name">${def.name}</div>`;
+          slot.querySelector('.dc-icon').appendChild(cardThumbCanvas(cardId, 36));
           slot.addEventListener('click', () => {
             this._editDeck.delete(cardId);
             this._redrawDeckTab(unlocked);
@@ -206,12 +208,13 @@ class Game {
         el.className = ['coll-card', `rarity-${def.rarity}`, isInDeck ? 'in-deck' : '', !isUnlocked ? 'locked' : ''].filter(Boolean).join(' ');
         el.innerHTML = `
           <div class="cc-cost">${def.cost}</div>
-          <div class="cc-icon">${def.icon}</div>
+          <div class="cc-icon"></div>
           <div class="cc-name">${def.name}</div>
           <div class="cc-rarity">${def.rarity}</div>
           ${!isUnlocked ? '<div class="cc-lock">&#128274;</div>' : ''}
           ${isInDeck    ? '<div class="cc-check">&#10003;</div>' : ''}
         `;
+        el.querySelector('.cc-icon').appendChild(cardThumbCanvas(id, 36));
         if (isUnlocked) {
           el.addEventListener('click', () => {
             if (this._editDeck.has(id)) {
@@ -287,13 +290,14 @@ class Game {
         el.className = ['shop-card', `rarity-${item.def.rarity}`, item.owned ? 'owned' : '', item.bought ? 'bought' : ''].filter(Boolean).join(' ');
         el.innerHTML = `
           <div class="sc-cost">${item.def.cost}</div>
-          <div class="sc-icon">${item.def.icon}</div>
+          <div class="sc-icon"></div>
           <div class="sc-name">${item.def.name}</div>
           <div class="sc-rarity">${item.def.rarity}</div>
           ${item.bought ? '<div class="sc-status">Bought</div>' :
             item.owned  ? '<div class="sc-status owned-lbl">Owned</div>' :
             `<button class="sc-buy-btn ${canAfford ? '' : 'no-coins'}">C ${item.price}</button>`}
         `;
+        el.querySelector('.sc-icon').appendChild(cardThumbCanvas(item.id, 40));
         el.querySelector('.sc-buy-btn')?.addEventListener('click', () => {
           if (!canAfford) return;
           const result = this.account.buyShopCard(item.id);
