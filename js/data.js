@@ -232,8 +232,8 @@ export const CARD_DEFS = {
 
 export const ALL_CARD_IDS = Object.keys(CARD_DEFS);
 
-// 8 arena-0 cards: 3 enemies + 5 troops
+// 12-card starter deck: all 6 enemy types + 6 troops
 export const STARTER_DECK = [
-  'speeder', 'swarmer', 'berserker',
-  'grunt', 'splasher', 'shield_bearer', 'healer', 'sniper',
+  'speeder', 'swarmer', 'berserker', 'shadow', 'kamikaze', 'brute',
+  'grunt', 'splasher', 'shield_bearer', 'healer', 'sniper', 'tank',
 ];

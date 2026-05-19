@@ -167,34 +167,49 @@ class Game {
   }
 
   _redrawDeckTab(unlocked) {
+    const deckArr = [...this._editDeck];
+    const enemies = deckArr.filter(id => CARD_DEFS[id].type === 'enemy');
+    const troops  = deckArr.filter(id => CARD_DEFS[id].type === 'troop');
+    const valid   = enemies.length === 6 && troops.length === 6;
+
     const deckCountEl = document.getElementById('deck-count');
     const saveBtn     = document.getElementById('btn-save-deck');
-    if (deckCountEl) deckCountEl.textContent = `${this._editDeck.size}/8`;
-    if (saveBtn) saveBtn.disabled = this._editDeck.size !== 8;
+    if (deckCountEl) deckCountEl.textContent = `${enemies.length}/6 enemies · ${troops.length}/6 troops`;
+    if (saveBtn) saveBtn.disabled = !valid;
 
-    // Deck slots
+    // Deck slots — two labelled rows
     const slotsEl = document.getElementById('deck-slots');
     if (slotsEl) {
       slotsEl.innerHTML = '';
-      const deckArr = [...this._editDeck];
-      for (let i = 0; i < 8; i++) {
-        const slot = document.createElement('div');
-        slot.className = 'deck-slot';
-        if (deckArr[i]) {
-          const def = CARD_DEFS[deckArr[i]];
-          const cardId = deckArr[i];
-          slot.classList.add('filled');
-          slot.innerHTML = `<div class="dc-icon"></div><div class="dc-name">${def.name}</div>`;
-          slot.querySelector('.dc-icon').appendChild(cardThumbCanvas(cardId, 36));
-          slot.addEventListener('click', () => {
-            this._editDeck.delete(cardId);
-            this._redrawDeckTab(unlocked);
-          });
-        } else {
-          slot.innerHTML = `<div class="dc-empty">+</div>`;
+      const makeRow = (label, arr) => {
+        const sec = document.createElement('div');
+        sec.className = 'deck-section';
+        sec.innerHTML = `<div class="deck-section-label">${label}</div>`;
+        const row = document.createElement('div');
+        row.className = 'deck-section-row';
+        for (let i = 0; i < 6; i++) {
+          const slot = document.createElement('div');
+          slot.className = 'deck-slot';
+          if (arr[i]) {
+            const cardId = arr[i];
+            const def = CARD_DEFS[cardId];
+            slot.classList.add('filled');
+            slot.innerHTML = `<div class="dc-icon"></div><div class="dc-name">${def.name}</div>`;
+            slot.querySelector('.dc-icon').appendChild(cardThumbCanvas(cardId, 36));
+            slot.addEventListener('click', () => {
+              this._editDeck.delete(cardId);
+              this._redrawDeckTab(unlocked);
+            });
+          } else {
+            slot.innerHTML = `<div class="dc-empty">+</div>`;
+          }
+          row.appendChild(slot);
         }
-        slotsEl.appendChild(slot);
-      }
+        sec.appendChild(row);
+        return sec;
+      };
+      slotsEl.appendChild(makeRow('ENEMIES', enemies));
+      slotsEl.appendChild(makeRow('TROOPS', troops));
     }
 
     // Collection grid
@@ -219,8 +234,11 @@ class Game {
           el.addEventListener('click', () => {
             if (this._editDeck.has(id)) {
               this._editDeck.delete(id);
-            } else if (this._editDeck.size < 8) {
-              this._editDeck.add(id);
+            } else {
+              const eCnt = [...this._editDeck].filter(c => CARD_DEFS[c].type === 'enemy').length;
+              const tCnt = [...this._editDeck].filter(c => CARD_DEFS[c].type === 'troop').length;
+              if (def.type === 'enemy' && eCnt < 6) this._editDeck.add(id);
+              if (def.type === 'troop' && tCnt < 6) this._editDeck.add(id);
             }
             this._redrawDeckTab(unlocked);
           });
@@ -231,8 +249,12 @@ class Game {
   }
 
   _saveDeck() {
-    if (!this._editDeck || this._editDeck.size !== 8) return;
-    this.account.saveDeck([...this._editDeck]);
+    if (!this._editDeck) return;
+    const arr     = [...this._editDeck];
+    const enemies = arr.filter(id => CARD_DEFS[id].type === 'enemy').length;
+    const troops  = arr.filter(id => CARD_DEFS[id].type === 'troop').length;
+    if (enemies !== 6 || troops !== 6) return;
+    this.account.saveDeck(arr);
     const btn = document.getElementById('btn-save-deck');
     if (btn) {
       btn.textContent = 'Saved!';

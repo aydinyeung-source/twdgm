@@ -186,7 +186,10 @@ export class Account {
   }
 
   saveDeck(cardIds) {
-    if (!this.user || cardIds.length !== 8) return false;
+    if (!this.user || cardIds.length !== 12) return false;
+    const enemies = cardIds.filter(id => CARD_DEFS[id]?.type === 'enemy').length;
+    const troops  = cardIds.filter(id => CARD_DEFS[id]?.type === 'troop').length;
+    if (enemies !== 6 || troops !== 6) return false;
     if (!cardIds.every(id => this.user.unlockedCards.includes(id))) return false;
     this.user.deck = [...cardIds];
     localStorage.setItem(USER_KEY, JSON.stringify(this.user));
