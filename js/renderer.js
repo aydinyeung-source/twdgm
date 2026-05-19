@@ -373,7 +373,7 @@ export class Renderer {
     if (u.stunTimer > 0) {
       ctx.save();
       ctx.fillStyle = '#fbbf24';
-      ctx.font = 'bold 10px Inter, sans-serif';
+      ctx.font = 'bold 10px Nunito, sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('ZAP', u.x, u.y - u.r - 16);
       ctx.restore();
@@ -423,7 +423,7 @@ export class Renderer {
     _rrect(ctx, bx, by, bw, bh, 8); ctx.stroke();
 
     ctx.fillStyle = isOT ? '#fff' : lowTime ? '#fff' : '#f5c518';
-    ctx.font = 'bold 15px Inter, sans-serif';
+    ctx.font = 'bold 15px Nunito, sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(label, CW/2, midY);
     ctx.restore();
@@ -438,7 +438,7 @@ export class Renderer {
       ctx.lineWidth = 1;
       _rrect(ctx, tx, 8, tw, th, 6); ctx.stroke();
       ctx.fillStyle = '#fca5a5';
-      ctx.font = 'bold 11px Inter, sans-serif';
+      ctx.font = 'bold 11px Nunito, sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(state.oppName, CW/2, 19);
       ctx.restore();

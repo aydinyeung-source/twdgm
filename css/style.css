@@ -35,8 +35,8 @@
   --c-elixir:    var(--purple);
   --c-elixir2:   var(--purple-light);
 
-  --font-title:  'Cinzel', serif;
-  --font-ui:     'Inter', sans-serif;
+  --font-title:  'Lilita One', sans-serif;
+  --font-ui:     'Nunito', sans-serif;
   --radius-card: 14px;
   --radius-sm:   8px;
 
@@ -83,13 +83,13 @@ input  { font-family: inherit; outline: none; }
 
 .logo-text {
   font-family: var(--font-title);
-  font-size: 38px;
-  letter-spacing: 5px;
+  font-size: 42px;
+  letter-spacing: 2px;
   color: var(--white);
-  text-shadow: 0 0 30px rgba(45,139,204,0.6), 0 2px 4px rgba(0,0,0,0.5);
+  text-shadow: 0 0 30px rgba(45,139,204,0.6), 0 3px 0 rgba(0,0,0,0.4);
 }
 .logo-text .accent { color: var(--yellow-warm); }
-.logo-text.small { font-size: 24px; letter-spacing: 3px; }
+.logo-text.small { font-size: 26px; letter-spacing: 1px; }
 
 .loading-bar-wrap {
   width: 220px; height: 5px;
