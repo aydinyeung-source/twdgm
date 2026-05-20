@@ -5,6 +5,7 @@
 
 -- ── Extensions ───────────────────────────────────────────────
 create extension if not exists "pgcrypto";
+create extension if not exists "citext";   -- case-insensitive text type for usernames
 
 -- ── Helpers ──────────────────────────────────────────────────
 create or replace function generate_player_tag()
@@ -36,9 +37,10 @@ values ('Season 1', now(), true)
 on conflict do nothing;
 
 -- ── Users ────────────────────────────────────────────────────
+-- username is citext so "Alex" and "alex" are treated as the same username.
 create table if not exists users (
   id              uuid        primary key default gen_random_uuid(),
-  username        text        not null unique,
+  username        citext      not null unique,   -- case-insensitive unique
   password_hash   text        not null,
   player_tag      text        not null unique default generate_player_tag(),
   trophies        int         not null default 0,

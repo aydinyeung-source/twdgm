@@ -96,6 +96,8 @@ export class Account {
 
   async register(username, password) {
     if (!username || username.length < 2) throw new Error('Username must be at least 2 characters.');
+    if (username.length > 20) throw new Error('Username must be 20 characters or less.');
+    if (!/^[A-Za-z0-9_]+$/.test(username)) throw new Error('Username can only contain letters, numbers, and underscores.');
     const email = username.toLowerCase() + '@twdgm.game';
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) {
