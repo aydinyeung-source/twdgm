@@ -414,11 +414,17 @@ class Game {
         const range   = def.r + 20 + (sp?.extraRange ?? 0);
         const atkRate = def.rate && def.rate < 9000 ? (def.rate / 1000).toFixed(1) + 's' : '—';
         const targets = def.antiAir ? 'Air & Ground' : 'Ground';
+        const atkType = (!def.dmg || def.rate >= 9000) ? 'Passive'
+          : sp?.type === 'splash'    ? 'Splash'
+          : sp?.type === 'kamikaze'  ? 'AOE on Death'
+          : sp?.type === 'long_range'? 'Ranged'
+          : 'Melee';
         statsEl.innerHTML =
           ms(hp, 'HP') +
           (dmg ? ms(dmg, 'Damage') : '') +
           (def.rate && def.rate < 9000 ? ms(atkRate, 'ATK Rate') : '') +
           ms(range,   'Range')   +
+          ms(atkType, 'Attack')  +
           ms(targets, 'Targets') +
           (sp?.splashR    ? ms(sp.splashR,  'Splash R')  : '') +
           (sp?.auraR      ? ms(sp.auraR,    'Aura R')    : '') +
