@@ -134,26 +134,28 @@ export class Account {
   }
 
   async updateStats(won, coinMult = 1) {
-    if (!this.user) return;
-    if (won) this.user.wins   = (this.user.wins   ?? 0) + 1;
-    else     this.user.losses = (this.user.losses ?? 0) + 1;
-    // Only award/deduct trophies in normal (1×) mode
+    if (!this.user) return 0;
+    // Practice mode: no stats, no coins
+    if (coinMult === 'practice') return 0;
+
+    // Only normal (1×) mode updates profile stats visible to the player
     if (coinMult === 1) {
+      if (won) this.user.wins   = (this.user.wins   ?? 0) + 1;
+      else     this.user.losses = (this.user.losses ?? 0) + 1;
       this.user.trophies = Math.max(0, (this.user.trophies ?? 0) + (won ? 15 : -8));
+      if (!this.user.matchHistory) this.user.matchHistory = [];
+      this.user.matchHistory.push({ ts: Date.now(), won });
+      if (this.user.matchHistory.length > 500) this.user.matchHistory = this.user.matchHistory.slice(-500);
     }
 
     const today = new Date().toDateString();
     let earn = won ? COINS.WIN : COINS.LOSS;
-    if (won && this.user.firstWinDate !== today) {
+    if (coinMult === 1 && won && this.user.firstWinDate !== today) {
       earn += COINS.FIRST_WIN_BONUS;
       this.user.firstWinDate = today;
     }
     earn = coinMult === Infinity ? 9999 : Math.round(earn * coinMult);
     this.user.coins = (this.user.coins ?? 0) + earn;
-
-    if (!this.user.matchHistory) this.user.matchHistory = [];
-    this.user.matchHistory.push({ ts: Date.now(), won });
-    if (this.user.matchHistory.length > 500) this.user.matchHistory = this.user.matchHistory.slice(-500);
 
     this._save_silent(this.user);
     return earn;

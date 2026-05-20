@@ -323,6 +323,17 @@ input  { font-family: inherit; outline: none; }
   border-color: #a855f7;
   color: #c4b5fd;
 }
+.mode-practice {
+  grid-column: 1 / -1;
+  background: rgba(16,185,129,0.08);
+  border-color: rgba(16,185,129,0.35);
+  color: #34d399;
+}
+.mode-practice.active {
+  background: rgba(16,185,129,0.22);
+  border-color: #10b981;
+  color: #6ee7b7;
+}
 
 /* ── Profile tab ──────────────────────────────────────────── */
 .profile-panel { display: flex; flex-direction: column; align-items: center; gap: 24px; padding-top: 12px; }

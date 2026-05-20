@@ -7,7 +7,7 @@ import { Hand }                    from './cards.js';
 import { Renderer }                from './renderer.js';
 import { UI }                      from './ui.js';
 import { Account }                 from './account.js';
-import { LocalBot, MSG } from './network.js';
+import { LocalBot, PracticeBot, MSG } from './network.js';
 
 // ── Game state container ──────────────────────────────────
 class State {
@@ -823,7 +823,7 @@ class Game {
     this.ui.show('matchmaking');
     this.ui.startMatchmakingTimer();
 
-    this.net = new LocalBot();
+    this.net = this._coinMode === 'practice' ? new PracticeBot() : new LocalBot();
     this.net
       .on(MSG.MATCH_FOUND,  msg => this._onMatchFound(msg))
       .on(MSG.OPP_DEPLOY,   msg => this._onOppDeploy(msg))
@@ -1343,7 +1343,7 @@ class Game {
     document.querySelectorAll('.mode-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const v = btn.dataset.mult;
-        this._coinMode = v === 'inf' ? Infinity : Number(v);
+        this._coinMode = v === 'inf' ? Infinity : v === 'practice' ? 'practice' : Number(v);
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b === btn));
         document.getElementById('modes-modal')?.classList.add('hidden');
         this._updateModeDisplay();
@@ -1354,9 +1354,10 @@ class Game {
   _updateModeDisplay() {
     const el = document.getElementById('modes-current');
     if (!el) return;
-    if (this._coinMode === Infinity) el.textContent = '∞ Coins';
-    else if (this._coinMode === 1)   el.textContent = 'Normal';
-    else                              el.textContent = `${this._coinMode}× Coins`;
+    if (this._coinMode === 'practice') el.textContent = 'Practice';
+    else if (this._coinMode === Infinity) el.textContent = '∞ Coins';
+    else if (this._coinMode === 1)        el.textContent = 'Normal';
+    else                                  el.textContent = `${this._coinMode}× Coins`;
   }
 
   _updateFriendsBadge() {
