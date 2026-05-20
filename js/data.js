@@ -2,27 +2,35 @@
 export const CW = 520;
 export const CH = 880;
 
-export const RIVER_Y1 = 420;
-export const RIVER_Y2 = 460;
+// Split-canvas: left half = player's defense, right half = opponent's territory
+export const HALF_W = 260;
 
+// Path waypoints in local half-space (x: 0 to HALF_W).
+// Enemies follow these from top to bottom; right side adds HALF_W to x.
+export const PATH_WP = [
+  { x: 200, y: 35  },
+  { x: 200, y: 130 },
+  { x: 60,  y: 130 },
+  { x: 60,  y: 300 },
+  { x: 200, y: 300 },
+  { x: 200, y: 470 },
+  { x: 60,  y: 470 },
+  { x: 60,  y: 640 },
+  { x: 200, y: 640 },
+  { x: 130, y: 752 },  // base
+];
+
+// Legacy aliases kept for any code that still imports them
+export const RIVER_Y1  = 0;
+export const RIVER_Y2  = 0;
 export const LANE_LEFT  = 130;
 export const LANE_RIGHT = 390;
 
-export const SPAWN = {
-  SELF_TROOP:   472,
-  SELF_ENEMY:   104,
-  OPP_TROOP:    408,
-  OPP_ENEMY:    776,
-};
-
-// ── Tower definitions ──────────────────────────────────────
+// ── Tower / base definitions ───────────────────────────────
+// One base per side, positioned at PATH_WP end on each half
 export const TOWER_DEFS = {
-  oppKing:  { id: 'oppKing',  owner: 'opp', kind: 'king',     x: 260, y: 56,  r: 42, hp: 240, dmg: 14, range: 160, rate: 1600 },
-  oppLeft:  { id: 'oppLeft',  owner: 'opp', kind: 'princess', x: 88,  y: 196, r: 30, hp: 120, dmg: 9,  range: 180, rate: 1200 },
-  oppRight: { id: 'oppRight', owner: 'opp', kind: 'princess', x: 432, y: 196, r: 30, hp: 120, dmg: 9,  range: 180, rate: 1200 },
-  plyLeft:  { id: 'plyLeft',  owner: 'ply', kind: 'princess', x: 88,  y: 684, r: 30, hp: 120, dmg: 9,  range: 180, rate: 1200 },
-  plyRight: { id: 'plyRight', owner: 'ply', kind: 'princess', x: 432, y: 684, r: 30, hp: 120, dmg: 9,  range: 180, rate: 1200 },
-  plyKing:  { id: 'plyKing',  owner: 'ply', kind: 'king',     x: 260, y: 824, r: 42, hp: 240, dmg: 14, range: 160, rate: 1600 },
+  plyKing: { id: 'plyKing', owner: 'ply', kind: 'king', x: 130,       y: 752, r: 40, hp: 300, dmg: 16, range: 170, rate: 1600 },
+  oppKing: { id: 'oppKing', owner: 'opp', kind: 'king', x: 130+HALF_W, y: 752, r: 40, hp: 300, dmg: 16, range: 170, rate: 1600 },
 };
 
 // Tower regeneration: regen starts after TOWER_REGEN_DELAY ms of no damage

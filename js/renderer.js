@@ -1,8 +1,7 @@
-import { CW, CH, RIVER_Y1, RIVER_Y2, LANE_LEFT, LANE_RIGHT } from './data.js';
+import { CW, CH, HALF_W, PATH_WP } from './data.js';
 import { clamp } from './engine.js';
 
-const BRIDGE_L = { x1: 90,  x2: 170 };
-const BRIDGE_R = { x1: 350, x2: 430 };
+const CELL = 40;  // defender grid cell size
 
 // Palette
 const PAL = {
@@ -74,10 +73,10 @@ export class Renderer {
   frame(state, particles) {
     const { ctx } = this;
     ctx.clearRect(0, 0, CW, CH);
-    this._drawArena();
-    this._drawRiver();
-    this._drawBridges();
-    this._drawDecorations();
+    this._drawBackground();
+    this._drawGrid();
+    this._drawPaths();
+    this._drawDivider();
     this._drawTowers(state.towers);
     this._drawUnits(state.units);
     this._drawProjectiles(state.projectiles);
@@ -85,145 +84,121 @@ export class Renderer {
     this._drawOverlay(state);
   }
 
-  // ── Arena floor ─────────────────────────────────────────
-  _drawArena() {
+  // ── Background ──────────────────────────────────────────
+  _drawBackground() {
     const { ctx } = this;
-    const T = 28;
-
-    // Opponent half
-    for (let ty = 0; ty < RIVER_Y1; ty += T) {
+    const T = 32;
+    for (let ty = 0; ty < CH; ty += T) {
       for (let tx = 0; tx < CW; tx += T) {
+        const isLeft = tx < HALF_W;
         const odd = (Math.floor(tx/T) + Math.floor(ty/T)) % 2;
-        ctx.fillStyle = odd ? PAL.arenaOpp : PAL.arenaOpp2;
+        ctx.fillStyle = isLeft
+          ? (odd ? PAL.arenaPly : PAL.arenaPly2)
+          : (odd ? PAL.arenaOpp : PAL.arenaOpp2);
         ctx.fillRect(tx, ty, T, T);
       }
     }
-    // Player half
-    for (let ty = RIVER_Y2; ty < CH; ty += T) {
-      for (let tx = 0; tx < CW; tx += T) {
-        const odd = (Math.floor(tx/T) + Math.floor(ty/T)) % 2;
-        ctx.fillStyle = odd ? PAL.arenaPly : PAL.arenaPly2;
-        ctx.fillRect(tx, ty, T, T);
-      }
-    }
-
-    // Team color overlays
-    ctx.fillStyle = 'rgba(239,68,68,0.05)';
-    ctx.fillRect(0, 0, CW, RIVER_Y1);
-    ctx.fillStyle = 'rgba(59,130,246,0.05)';
-    ctx.fillRect(0, RIVER_Y2, CW, CH - RIVER_Y2);
-
-    // Side walls
-    const wallGrad = ctx.createLinearGradient(0, 0, 18, 0);
-    wallGrad.addColorStop(0, 'rgba(0,0,0,0.55)');
-    wallGrad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = wallGrad;
-    ctx.fillRect(0, 0, 18, CH);
-    const wallGrad2 = ctx.createLinearGradient(CW-18, 0, CW, 0);
-    wallGrad2.addColorStop(0, 'rgba(0,0,0,0)');
-    wallGrad2.addColorStop(1, 'rgba(0,0,0,0.55)');
-    ctx.fillStyle = wallGrad2;
-    ctx.fillRect(CW-18, 0, 18, CH);
+    ctx.fillStyle = 'rgba(59,130,246,0.04)';
+    ctx.fillRect(0, 0, HALF_W, CH);
+    ctx.fillStyle = 'rgba(239,68,68,0.04)';
+    ctx.fillRect(HALF_W, 0, HALF_W, CH);
   }
 
-  // ── River ───────────────────────────────────────────────
-  _drawRiver() {
+  // ── Defender grid (left side only) ──────────────────────
+  _drawGrid() {
     const { ctx } = this;
-    const h = RIVER_Y2 - RIVER_Y1;
-
-    const grad = ctx.createLinearGradient(0, RIVER_Y1, 0, RIVER_Y2);
-    grad.addColorStop(0,   PAL.riverDark);
-    grad.addColorStop(0.5, PAL.riverMid);
-    grad.addColorStop(1,   PAL.riverDark);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, RIVER_Y1, CW, h);
-
-    // Animated shimmer lines
     ctx.save();
-    for (let i = 0; i < 4; i++) {
-      const yOff = RIVER_Y1 + 6 + i * 9;
-      const alpha = 0.06 + 0.04 * Math.sin(this._t * 0.8 + i);
-      ctx.globalAlpha = alpha;
-      ctx.strokeStyle = '#7dd3fc';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      for (let x = 0; x <= CW; x += 3) {
-        const y = yOff + Math.sin((x / 35) + this._t * 1.3 + i * 1.4) * 2.5;
-        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      ctx.stroke();
+    ctx.strokeStyle = 'rgba(59,130,246,0.10)';
+    ctx.lineWidth = 0.5;
+    for (let gx = 0; gx <= HALF_W; gx += CELL) {
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, CH); ctx.stroke();
+    }
+    for (let gy = 0; gy <= CH; gy += CELL) {
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(HALF_W, gy); ctx.stroke();
     }
     ctx.restore();
-
-    // Banks
-    ctx.fillStyle = '#1e4060';
-    ctx.fillRect(0, RIVER_Y1, CW, 3);
-    ctx.fillRect(0, RIVER_Y2 - 3, CW, 3);
   }
 
-  // ── Bridges ─────────────────────────────────────────────
-  _drawBridges() {
+  // ── Enemy paths (both sides) ─────────────────────────────
+  _drawPaths() {
+    this._drawOnePath(0);       // left: opponent's enemies travel here
+    this._drawOnePath(HALF_W);  // right: player's enemies travel here
+  }
+
+  _drawOnePath(xOff) {
     const { ctx } = this;
-    [BRIDGE_L, BRIDGE_R].forEach(br => {
-      const w = br.x2 - br.x1;
-      const h = RIVER_Y2 - RIVER_Y1;
+    const isLeft = xOff === 0;
 
-      // Wood base
-      ctx.fillStyle = PAL.bridgeWood;
-      ctx.fillRect(br.x1, RIVER_Y1, w, h);
+    ctx.save();
+    ctx.lineCap  = 'round';
+    ctx.lineJoin = 'round';
 
-      // Plank lines
-      ctx.strokeStyle = PAL.bridgePlank;
-      ctx.lineWidth = 1.5;
-      for (let y = RIVER_Y1 + 7; y < RIVER_Y2; y += 8) {
-        ctx.beginPath();
-        ctx.moveTo(br.x1 + 2, y);
-        ctx.lineTo(br.x2 - 2, y);
-        ctx.stroke();
-      }
+    // Glow border
+    ctx.strokeStyle = isLeft ? 'rgba(239,68,68,0.18)' : 'rgba(59,130,246,0.18)';
+    ctx.lineWidth = 42;
+    ctx.beginPath();
+    PATH_WP.forEach((p, i) => i === 0 ? ctx.moveTo(p.x+xOff, p.y) : ctx.lineTo(p.x+xOff, p.y));
+    ctx.stroke();
 
-      // Railing posts
-      ctx.fillStyle = '#7a5230';
-      ctx.fillRect(br.x1,     RIVER_Y1, w, 5);
-      ctx.fillRect(br.x1,     RIVER_Y2 - 5, w, 5);
-      // Post nails
-      for (let nx = br.x1 + 8; nx < br.x2; nx += 16) {
-        ctx.fillStyle = '#b8956a';
-        ctx.fillRect(nx - 1, RIVER_Y1, 2, 5);
-        ctx.fillRect(nx - 1, RIVER_Y2 - 5, 2, 5);
-      }
-    });
+    // Dark dirt floor
+    ctx.strokeStyle = isLeft ? '#110a0a' : '#0a0a11';
+    ctx.lineWidth = 34;
+    ctx.beginPath();
+    PATH_WP.forEach((p, i) => i === 0 ? ctx.moveTo(p.x+xOff, p.y) : ctx.lineTo(p.x+xOff, p.y));
+    ctx.stroke();
+
+    // Lighter center strip
+    ctx.strokeStyle = isLeft ? '#1c0e0e' : '#0e0e1c';
+    ctx.lineWidth = 22;
+    ctx.beginPath();
+    PATH_WP.forEach((p, i) => i === 0 ? ctx.moveTo(p.x+xOff, p.y) : ctx.lineTo(p.x+xOff, p.y));
+    ctx.stroke();
+
+    // Edge highlight
+    ctx.strokeStyle = isLeft ? 'rgba(239,68,68,0.22)' : 'rgba(59,130,246,0.22)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    PATH_WP.forEach((p, i) => i === 0 ? ctx.moveTo(p.x+xOff, p.y) : ctx.lineTo(p.x+xOff, p.y));
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Animated entry arrow at path start
+    const ep = PATH_WP[0];
+    const pulse = 0.65 + 0.35 * Math.sin(this._t * 3.5);
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = isLeft ? '#f87171' : '#60a5fa';
+    ctx.beginPath();
+    const ax = ep.x + xOff, ay = ep.y - 24;
+    ctx.moveTo(ax, ay + 14); ctx.lineTo(ax - 9, ay); ctx.lineTo(ax + 9, ay);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
-  // ── Decorations (symmetric top/bottom) ──────────────────
-  _drawDecorations() {
-    const ctx = this.ctx;
-    const pairs = [
-      // [x, yFromEdge, draw fn args...]
-      () => { _rock(ctx, 30,  70,  28, 16); _rock(ctx, 30,  CH-70,  28, 16); },
-      () => { _rock(ctx, 490, 70,  28, 16); _rock(ctx, 490, CH-70,  28, 16); },
-      () => { _rock(ctx, 55,  125, 18, 12); _rock(ctx, 55,  CH-125, 18, 12); },
-      () => { _rock(ctx, 465, 125, 18, 12); _rock(ctx, 465, CH-125, 18, 12); },
-      () => { _crystal(ctx, 18,  260, 16); _crystal(ctx, 18,  CH-260, 16); },
-      () => { _crystal(ctx, 502, 260, 16); _crystal(ctx, 502, CH-260, 16); },
-      () => { _crystal(ctx, 12,  330, 11); _crystal(ctx, 12,  CH-330, 11); },
-      () => { _crystal(ctx, 508, 330, 11); _crystal(ctx, 508, CH-330, 11); },
-      () => { _pebble(ctx, 205, 175, 5);   _pebble(ctx, 205, CH-175, 5);   },
-      () => { _pebble(ctx, 315, 175, 5);   _pebble(ctx, 315, CH-175, 5);   },
-      () => { _pebble(ctx, 188, 330, 4);   _pebble(ctx, 188, CH-330, 4);   },
-      () => { _pebble(ctx, 332, 330, 4);   _pebble(ctx, 332, CH-330, 4);   },
-    ];
-    pairs.forEach(fn => fn());
+  // ── Center divider ───────────────────────────────────────
+  _drawDivider() {
+    const { ctx } = this;
+    ctx.save();
+    const g = ctx.createLinearGradient(HALF_W - 1, 0, HALF_W + 1, 0);
+    g.addColorStop(0,   'rgba(59,130,246,0.5)');
+    g.addColorStop(0.5, 'rgba(200,200,255,0.8)');
+    g.addColorStop(1,   'rgba(239,68,68,0.5)');
+    ctx.strokeStyle = g;
+    ctx.lineWidth   = 2;
+    ctx.beginPath();
+    ctx.moveTo(HALF_W, 0);
+    ctx.lineTo(HALF_W, CH);
+    ctx.stroke();
+    ctx.restore();
   }
 
-  // ── Towers ──────────────────────────────────────────────
+  // ── Towers (bases at path ends) ──────────────────────────
   _drawTowers(towers) {
     if (!towers) return;
-    // Draw in order: back-to-front
-    const order = ['plyKing', 'oppKing', 'plyLeft', 'plyRight', 'oppLeft', 'oppRight'];
-    for (const k of order) {
-      const t = towers[k];
-      if (t) t.dead ? this._drawDestroyedTower(t) : this._drawTower(t);
+    for (const t of Object.values(towers)) {
+      t.dead ? this._drawDestroyedTower(t) : this._drawTower(t);
     }
   }
 
@@ -422,48 +397,42 @@ export class Renderer {
     }
   }
 
-  // ── Canvas overlay (timer, names) ───────────────────────
+  // ── Canvas overlay (timer, side labels) ─────────────────
   _drawOverlay(state) {
     const { ctx } = this;
-    const midY = RIVER_Y1 + (RIVER_Y2 - RIVER_Y1) / 2;
 
-    // Timer badge
+    // Side labels
+    ctx.save();
+    ctx.font = 'bold 10px Nunito, sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = 'rgba(100,160,240,0.55)';
+    ctx.textAlign = 'left';
+    ctx.fillText('YOUR DEFENSE', 6, 6);
+    ctx.fillStyle = 'rgba(240,100,100,0.55)';
+    ctx.textAlign = 'right';
+    ctx.fillText(state.oppName ? state.oppName.toUpperCase() : 'OPPONENT', CW - 6, 6);
+    ctx.restore();
+
+    // Timer badge centred on the divider line
     const secs = Math.max(0, Math.ceil(state.timeLeft));
     const mm   = Math.floor(secs / 60);
     const ss   = String(secs % 60).padStart(2, '0');
-    const label = state.overtime ? `OT  ${mm}:${ss}` : `${mm}:${ss}`;
-    const isOT  = state.overtime;
+    const label = state.overtime ? `OT ${mm}:${ss}` : `${mm}:${ss}`;
+    const isOT    = state.overtime;
     const lowTime = !isOT && secs <= 30;
 
-    const bw = 80, bh = 28, bx = CW/2 - bw/2, by = midY - bh/2;
+    const bw = 76, bh = 26, bx = CW/2 - bw/2, by = 4;
     ctx.save();
-    ctx.fillStyle = isOT ? 'rgba(220,38,38,0.88)' : lowTime ? 'rgba(245,158,11,0.88)' : PAL.timerBg;
-    _rrect(ctx, bx, by, bw, bh, 8); ctx.fill();
+    ctx.fillStyle = isOT ? 'rgba(220,38,38,0.92)' : lowTime ? 'rgba(245,158,11,0.92)' : PAL.timerBg;
+    _rrect(ctx, bx, by, bw, bh, 7); ctx.fill();
     ctx.strokeStyle = isOT ? '#ef4444' : PAL.timerBorder;
     ctx.lineWidth = 1;
-    _rrect(ctx, bx, by, bw, bh, 8); ctx.stroke();
-
+    _rrect(ctx, bx, by, bw, bh, 7); ctx.stroke();
     ctx.fillStyle = isOT ? '#fff' : lowTime ? '#fff' : '#f5c518';
-    ctx.font = 'bold 15px Nunito, sans-serif';
+    ctx.font = 'bold 14px Nunito, sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(label, CW/2, midY);
+    ctx.fillText(label, CW/2, by + bh/2);
     ctx.restore();
-
-    // Opponent name strip (top)
-    if (state.oppName) {
-      const tw = 130, th = 22, tx = CW/2 - tw/2;
-      ctx.save();
-      ctx.fillStyle = 'rgba(8,20,36,0.7)';
-      _rrect(ctx, tx, 8, tw, th, 6); ctx.fill();
-      ctx.strokeStyle = 'rgba(239,68,68,0.35)';
-      ctx.lineWidth = 1;
-      _rrect(ctx, tx, 8, tw, th, 6); ctx.stroke();
-      ctx.fillStyle = '#fca5a5';
-      ctx.font = 'bold 11px Nunito, sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(state.oppName, CW/2, 19);
-      ctx.restore();
-    }
   }
 
   // ── HP bar (shared) ──────────────────────────────────────
@@ -714,42 +683,6 @@ function _drawTower2D(ctx, x, y, s, color) {
   ctx.lineTo(x + s*0.25, y + s*0.8);
   ctx.lineTo(x - s*0.25, y + s*0.8);
   ctx.stroke();
-}
-
-// Decoration helpers
-function _rock(ctx, cx, cy, w, h) {
-  ctx.save();
-  ctx.fillStyle = '#1e2a3a';
-  ctx.strokeStyle = '#141f2e';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, w/2, h/2, 0, 0, Math.PI*2);
-  ctx.fill(); ctx.stroke();
-  ctx.restore();
-}
-
-function _crystal(ctx, cx, cy, s) {
-  ctx.save();
-  ctx.fillStyle = 'rgba(99,102,241,0.3)';
-  ctx.strokeStyle = '#818cf8';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - s);
-  ctx.lineTo(cx + s*0.5, cy);
-  ctx.lineTo(cx, cy + s*0.55);
-  ctx.lineTo(cx - s*0.5, cy);
-  ctx.closePath();
-  ctx.fill(); ctx.stroke();
-  ctx.restore();
-}
-
-function _pebble(ctx, cx, cy, r) {
-  ctx.save();
-  ctx.fillStyle = '#1a2332';
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI*2);
-  ctx.fill();
-  ctx.restore();
 }
 
 // Shared HP bar

@@ -1,4 +1,4 @@
-import { CARD_DEFS, MATCH_DURATION, CW, CHEST_DEFS, STARTER_DECK, RACE_DEFS, ARENA_TIERS, getArena, LANE_LEFT, LANE_RIGHT } from './data.js';
+import { CARD_DEFS, MATCH_DURATION, CW, CHEST_DEFS, STARTER_DECK, RACE_DEFS, ARENA_TIERS, getArena, HALF_W, PATH_WP } from './data.js';
 import { cardThumbCanvas }         from './cardart.js';
 import { GameLoop, Particles, dist } from './engine.js';
 import { Unit, Tower, Projectile, buildTowers } from './entities.js';
@@ -999,21 +999,45 @@ class Game {
   }
 
   // ── Spawn unit ─────────────────────────────────────────────
+  // Enemies go to the OPPONENT's half; defenders stay on the OWNER's half.
+  // Left half = player's defense. Right half = opponent's territory.
   _spawnUnit(cardId, owner, lane) {
     const def = CARD_DEFS[cardId];
     if (!def) return;
 
     const levelMult = owner === 'ply' ? this.account.getLevelMult(cardId) : 1;
+    const isEnemy   = def.type === 'enemy';
+
+    const side = isEnemy
+      ? (owner === 'ply' ? 'right' : 'left')
+      : (owner === 'ply' ? 'left'  : 'right');
+    const xOff = side === 'right' ? HALF_W : 0;
+
+    const _make = () => {
+      const u = new Unit(cardId, owner, lane, levelMult);
+      u._side = side;
+      u._xOff = xOff;
+      if (isEnemy) {
+        u._wpIdx = 0;
+        u.x = PATH_WP[0].x + xOff + (Math.random() - 0.5) * 14;
+        u.y = PATH_WP[0].y;
+      } else {
+        // Temp placement between path arms until grid drag is implemented
+        u.x = xOff + (lane === 0 ? 95 : 165) + (Math.random() - 0.5) * 18;
+        u.y = 160 + Math.round(Math.random() * 4) * 140 + (Math.random() - 0.5) * 18;
+      }
+      return u;
+    };
 
     if (def.special?.type === 'pack') {
       const count = def.special.count;
       for (let i = 0; i < count; i++) {
-        const u = new Unit(cardId, owner, lane, levelMult);
+        const u = _make();
         u.x += (i - Math.floor(count / 2)) * (u.r * 2.2);
         this.state.units.push(u);
       }
     } else {
-      this.state.units.push(new Unit(cardId, owner, lane, levelMult));
+      this.state.units.push(_make());
     }
   }
 
@@ -1052,6 +1076,7 @@ class Game {
       if (!['shield_aura', 'heal_aura', 'boost_aura'].includes(type)) continue;
       for (const tgt of this.state.units) {
         if (tgt.dead || tgt.owner !== src.owner || tgt === src) continue;
+        if (tgt._side !== src._side) continue;
         if (dist(src.x, src.y, tgt.x, tgt.y) > src.special.auraR) continue;
         if (type === 'shield_aura') tgt.shielded = true;
         if (type === 'heal_aura')   tgt.healRate += src.special.hps;
@@ -1078,9 +1103,12 @@ class Game {
       if (result.action === 'attack') {
         this._processAttack(u, result.target);
       } else if (result.action === 'spawn_minion') {
+        const parent = result.unit ?? u;
         const minion = new Unit(result.defId, u.owner, u.lane);
-        minion.x = u.x + u.dir * (u.r + minion.r + 4);
-        minion.y = u.y;
+        minion._side = u._side;
+        minion._xOff = u._xOff;
+        minion.x = parent.x + (Math.random() - 0.5) * 20;
+        minion.y = parent.y + parent.r + minion.r + 4;
         this.state.units.push(minion);
       }
     }
@@ -1091,6 +1119,7 @@ class Game {
     if (s?.type === 'kamikaze') {
       for (const u of this.state.units) {
         if (u.dead || u.owner === attacker.owner) continue;
+        if (u._side !== attacker._side) continue;
         if (dist(attacker.x, attacker.y, u.x, u.y) <= s.blastR) {
           const dmg = u.takeDamage(s.blastDmg * attacker.dmgMult ?? 1);
           u.stun(s.stunMs);
@@ -1105,6 +1134,7 @@ class Game {
       const hitSet = new Set();
       for (const u of this.state.units) {
         if (u.dead || u.owner === attacker.owner) continue;
+        if (u._side !== attacker._side) continue;
         if (dist(target.x, target.y, u.x, u.y) <= s.splashR) hitSet.add(u);
       }
       if (target instanceof Tower && !target.dead) {
@@ -1440,28 +1470,33 @@ class Game {
       const cx    = (e.clientX - rect.left)  / scale;
       const cy    = (e.clientY - rect.top)   / scale;
 
-      const isPlayerHalf = cy > 460;
-      const isOppHalf    = cy < 420;
-
-      const lane = cx < CW / 2 ? 0 : 1;
+      // Vertical split: left half = player defense, right half = opponent track
+      const isRightSide = cx >= HALF_W;
+      const lane = 0;  // grid-based lane will replace this in a future phase
 
       if (def.type === 'spell') {
         this.hand.tryDeploy(lane, { x: cx, y: cy });
         return;
       }
 
-      if ((def.type === 'troop' || def.type === 'building') && !isPlayerHalf) {
-        this.ui.showDeployHint(true);
-        setTimeout(() => this.ui.showDeployHint(false), 1500);
-        return;
-      }
-      if (def.type === 'enemy' && !isOppHalf) {
-        this.ui.showDeployHint(true);
-        setTimeout(() => this.ui.showDeployHint(false), 1500);
+      // Enemies: one click on right side → spawn at top of opponent's track
+      if (def.type === 'enemy') {
+        if (!isRightSide) {
+          this.ui.showDeployHint(true);
+          setTimeout(() => this.ui.showDeployHint(false), 1500);
+          return;
+        }
+        this.hand.tryDeploy(0);
         return;
       }
 
-      this.hand.tryDeploy(lane);
+      // Troops/buildings: click on left side to place on your defense grid
+      if (isRightSide) {
+        this.ui.showDeployHint(true);
+        setTimeout(() => this.ui.showDeployHint(false), 1500);
+        return;
+      }
+      this.hand.tryDeploy(0);
     });
 
     window.addEventListener('keydown', e => {

@@ -1,5 +1,5 @@
 import { uid, dist } from './engine.js';
-import { CARD_DEFS, TOWER_DEFS, LANE_LEFT, LANE_RIGHT, TOWER_REGEN_RATE, TOWER_REGEN_DELAY } from './data.js';
+import { CARD_DEFS, TOWER_DEFS, LANE_LEFT, LANE_RIGHT, TOWER_REGEN_RATE, TOWER_REGEN_DELAY, PATH_WP, HALF_W } from './data.js';
 
 // ── Tower ──────────────────────────────────────────────────
 export class Tower {
@@ -59,10 +59,11 @@ export class Tower {
   _findTarget(units) {
     let best = null, bestDist = Infinity;
     const hostile = this.owner === 'ply' ? 'opp' : 'ply';
+    const mySide  = this.x < HALF_W ? 'left' : 'right';
     for (const u of units) {
       if (u.dead || u.owner !== hostile) continue;
+      if (u._side !== mySide) continue;
       if (u.cloakTimer > 0) continue;
-      // Towers can hit both ground and air
       const d = dist(this.x, this.y, u.x, u.y);
       if (d <= this.range + u.r && d < bestDist) { bestDist = d; best = u; }
     }
@@ -79,10 +80,9 @@ export class Unit {
     this.owner     = owner;
     this.lane      = lane;
     this.laneX     = lane === 0 ? LANE_LEFT : LANE_RIGHT;
-    this.x         = this.laneX + (Math.random() - 0.5) * 18;
-    this.y         = _spawnY(def, owner);
+    this.x         = this.laneX;
+    this.y         = 400;
 
-    // Apply level multiplier to base stats
     this.hp        = def.hp   * levelMult;
     this.maxHp     = def.hp   * levelMult;
     this.baseSpeed = def.speed;
@@ -101,7 +101,7 @@ export class Unit {
     this.dead      = false;
     this.cooldown  = 0;
     this.stunTimer = 0;
-    this.cloakTimer= def.special?.type === 'cloak' ? def.special.durationMs : 0;
+    this.cloakTimer   = def.special?.type === 'cloak' ? def.special.durationMs : 0;
     this.spawnerTimer = 0;
     this.incomeTimer  = 0;
     this.flashTimer   = 0;
@@ -111,17 +111,20 @@ export class Unit {
     this.dmgMult   = 1;
     this.spdMult   = 1;
 
-    this.target    = null;
     this.state     = 'march';
+
+    // Path-following fields (set by _spawnUnit before unit is live)
+    this._side    = 'left';   // 'left' or 'right' canvas half
+    this._xOff    = 0;        // x-offset into canvas (0 = left, HALF_W = right)
+    this._wpIdx   = 0;        // current waypoint index (enemies only)
+    this._isEnemy = def.type === 'enemy';
   }
 
   get speed() { return this.baseSpeed * this.spdMult; }
   get dmg()   { return this.baseDmg   * this.dmgMult; }
   get attackRange() {
     const base = this.r + 36;
-    return this.special?.type === 'long_range'
-      ? base + this.special.extraRange
-      : base;
+    return this.special?.type === 'long_range' ? base + this.special.extraRange : base;
   }
 
   takeDamage(amount) {
@@ -133,18 +136,14 @@ export class Unit {
 
   stun(ms) { this.stunTimer = Math.max(this.stunTimer, ms); }
 
-  // Returns { action, target } or null
   update(dt, units, towers) {
     if (this.dead) return null;
-
     const dtms = dt * 1000;
     if (this.flashTimer  > 0) this.flashTimer  -= dtms;
     if (this.cloakTimer  > 0) this.cloakTimer  -= dtms;
     if (this.cooldown    > 0) this.cooldown    -= dtms;
     if (this.stunTimer   > 0) { this.stunTimer -= dtms; return null; }
-
     if (this.special?.type === 'income') return null;
-
     if (this.special?.type === 'spawner') {
       this.spawnerTimer += dtms;
       if (this.spawnerTimer >= this.special.intervalMs) {
@@ -152,73 +151,79 @@ export class Unit {
         return { action: 'spawn_minion', defId: this.special.spawnId, unit: this };
       }
     }
+    return this._isEnemy ? this._updateEnemy(dt, units, towers) : this._updateDefender(dt, units);
+  }
 
+  // Enemies: follow path waypoints, stop to fight defenders in aggro range.
+  // When the last waypoint is passed they attack the base directly.
+  _updateEnemy(dt, units, towers) {
     const hostile    = this.owner === 'ply' ? 'opp' : 'ply';
     const aggroRange = this.r + 90;
-    let unitTarget   = null;
-    let unitTargetD  = Infinity;
+
+    // Fight a nearby defender on the same side
+    let unitTarget = null, unitTargetD = Infinity;
     for (const u of units) {
-      if (u.dead || u.owner !== hostile) continue;
+      if (u.dead || u.owner !== hostile || u._side !== this._side) continue;
       if (u.cloakTimer > 0) continue;
-      // Air units can only be targeted by antiAir troops
       if (u.flying && !this.antiAir) continue;
       const d = dist(this.x, this.y, u.x, u.y);
       if (d < aggroRange && d < unitTargetD) { unitTargetD = d; unitTarget = u; }
     }
 
-    let chosenTarget = unitTarget;
-    // Flying units skip ground towers... actually towers hit everything, so flying
-    // units still target towers. Ground-only units can't TARGET towers if they're
-    // a flying unit targeting a tower (towers always shoot back).
-    if (!chosenTarget) {
-      // Flying units still target towers (they fly over the arena to towers)
-      chosenTarget = this._bestTowerTarget(towers);
-    }
-
-    if (!chosenTarget) return null;
-
-    const d = dist(this.x, this.y, chosenTarget.x, chosenTarget.y);
-    const inRange = d <= this.attackRange + chosenTarget.r;
-
-    if (inRange) {
+    if (unitTarget) {
       this.state = 'fight';
-      if (this.cooldown <= 0) {
-        this.cooldown = this.rate;
-        this.flashTimer = 100;
-        return { action: 'attack', target: chosenTarget, unit: this };
+      const d = dist(this.x, this.y, unitTarget.x, unitTarget.y);
+      if (d <= this.attackRange + unitTarget.r && this.cooldown <= 0) {
+        this.cooldown = this.rate; this.flashTimer = 100;
+        return { action: 'attack', target: unitTarget };
       }
-    } else {
-      this.state = 'march';
-      const targetX = chosenTarget instanceof Tower ? this.laneX : chosenTarget.x;
-      const dx = targetX - this.x;
-      const dy = chosenTarget.y - this.y;
+      const dx = unitTarget.x - this.x, dy = unitTarget.y - this.y;
       const mag = Math.hypot(dx, dy);
-      if (mag > 1) {
-        const nx = dx / mag, ny = dy / mag;
-        const laneBlend = unitTarget ? 0.3 : 0.7;
-        const moveX = nx * (1 - laneBlend) + ((this.laneX - this.x) / (Math.abs(this.laneX - this.x) + 1)) * laneBlend;
-        this.x += moveX  * this.speed * dt;
-        this.y += ny     * this.speed * dt;
-      }
+      if (mag > 1) { this.x += (dx/mag)*this.speed*dt; this.y += (dy/mag)*this.speed*dt; }
+      return null;
     }
+
+    // At last waypoint – attack the base tower
+    if (this._wpIdx >= PATH_WP.length) {
+      this.state = 'fight';
+      const baseId = this.owner === 'ply' ? 'oppKing' : 'plyKing';
+      const base   = towers[baseId];
+      if (base && !base.dead && this.cooldown <= 0) {
+        this.cooldown = this.rate; this.flashTimer = 100;
+        return { action: 'attack', target: base };
+      }
+      return null;
+    }
+
+    // Follow path waypoints
+    this.state = 'march';
+    const wp = PATH_WP[this._wpIdx];
+    const tx = wp.x + this._xOff, ty = wp.y;
+    const dx = tx - this.x, dy = ty - this.y;
+    const d  = Math.hypot(dx, dy);
+    if (d < 8) this._wpIdx++;
+    else { this.x += (dx/d)*this.speed*dt; this.y += (dy/d)*this.speed*dt; }
     return null;
   }
 
-  _bestTowerTarget(towers) {
+  // Defenders: stay in place, shoot enemies in range on the same side.
+  _updateDefender(dt, units) {
     const hostile = this.owner === 'ply' ? 'opp' : 'ply';
-    const side = this.lane === 0 ? 'Left' : 'Right';
-    const princess = towers[hostile + side];
-    const king = towers[hostile + 'King'];
-    if (princess && !princess.dead) return princess;
-    if (king && !king.dead) return king;
-    return null;
+    let best = null, bestDist = Infinity;
+    for (const u of units) {
+      if (u.dead || u.owner !== hostile || u._side !== this._side) continue;
+      if (u.cloakTimer > 0) continue;
+      if (u.flying && !this.antiAir) continue;
+      const d = dist(this.x, this.y, u.x, u.y);
+      if (d <= this.attackRange + u.r && d < bestDist) { bestDist = d; best = u; }
+    }
+    if (!best || this.cooldown > 0) return null;
+    this.cooldown = this.rate; this.flashTimer = 100;
+    this.state = 'fight';
+    return { action: 'attack', target: best };
   }
 }
 
-function _spawnY(def, owner) {
-  if (owner === 'ply') return def.type === 'troop' ? 472 : 104;
-  return def.type === 'troop' ? 408 : 776;
-}
 
 // ── Projectile ─────────────────────────────────────────────
 export class Projectile {
