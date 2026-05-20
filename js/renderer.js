@@ -1,7 +1,5 @@
-import { CW, CH, HALF_W, PATH_WP } from './data.js';
+import { CW, CH, HALF_W, PATH_WP, CELL, VALID_CELLS } from './data.js';
 import { clamp } from './engine.js';
-
-const CELL = 40;  // defender grid cell size
 
 // Palette
 const PAL = {
@@ -77,6 +75,7 @@ export class Renderer {
     this._drawGrid();
     this._drawPaths();
     this._drawDivider();
+    if (state.showValidCells) this._drawValidCells(state);
     this._drawTowers(state.towers);
     this._drawUnits(state.units);
     this._drawProjectiles(state.projectiles);
@@ -102,6 +101,28 @@ export class Renderer {
     ctx.fillRect(0, 0, HALF_W, CH);
     ctx.fillStyle = 'rgba(239,68,68,0.04)';
     ctx.fillRect(HALF_W, 0, HALF_W, CH);
+  }
+
+  // ── Valid cell highlights (shown when defender card is selected) ─
+  _drawValidCells(state) {
+    const { ctx } = this;
+    ctx.save();
+    // Faint tint on every valid cell
+    ctx.fillStyle = 'rgba(52,211,153,0.10)';
+    for (const c of VALID_CELLS) {
+      ctx.fillRect(c.cx - CELL/2 + 1, c.cy - CELL/2 + 1, CELL - 2, CELL - 2);
+    }
+    // Bright highlight on the hovered cell
+    if (state.hovCell) {
+      const { cx, cy } = state.hovCell;
+      const x = cx - CELL/2 + 1, y = cy - CELL/2 + 1, s = CELL - 2;
+      ctx.fillStyle = 'rgba(52,211,153,0.40)';
+      ctx.fillRect(x, y, s, s);
+      ctx.strokeStyle = '#34d399';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x + 0.75, y + 0.75, s - 1.5, s - 1.5);
+    }
+    ctx.restore();
   }
 
   // ── Defender grid (left side only) ──────────────────────

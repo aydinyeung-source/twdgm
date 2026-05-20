@@ -20,6 +20,34 @@ export const PATH_WP = [
   { x: 130, y: 752 },  // base
 ];
 
+export const CELL = 40;  // defender grid cell size (px)
+
+function _ptSegDist(px, py, ax, ay, bx, by) {
+  const dx = bx-ax, dy = by-ay, l2 = dx*dx+dy*dy;
+  if (!l2) return Math.hypot(px-ax, py-ay);
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx+(py-ay)*dy)/l2));
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+}
+
+// Valid defender cell centers on the left half (local coords, xOff = 0).
+// A cell is valid when its center is ≥28px from any path segment and ≥52px from the base.
+export const VALID_CELLS = (() => {
+  const CLR = 28, BASE_CLR = 52, BASE_X = 130, BASE_Y = 752;
+  const cells = [];
+  for (let col = 0; col * CELL + CELL/2 < HALF_W; col++) {
+    for (let row = 0; row * CELL + CELL/2 < CH; row++) {
+      const cx = col * CELL + CELL/2;
+      const cy = row * CELL + CELL/2;
+      let ok = true;
+      for (let i = 0; i < PATH_WP.length - 1 && ok; i++)
+        if (_ptSegDist(cx, cy, PATH_WP[i].x, PATH_WP[i].y, PATH_WP[i+1].x, PATH_WP[i+1].y) < CLR) ok = false;
+      if (ok && Math.hypot(cx - BASE_X, cy - BASE_Y) < BASE_CLR) ok = false;
+      if (ok) cells.push({ cx, cy });
+    }
+  }
+  return cells;
+})();
+
 // Legacy aliases kept for any code that still imports them
 export const RIVER_Y1  = 0;
 export const RIVER_Y2  = 0;

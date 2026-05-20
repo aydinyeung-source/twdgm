@@ -1,4 +1,4 @@
-import { CARD_DEFS, MATCH_DURATION, CW, CHEST_DEFS, STARTER_DECK, RACE_DEFS, ARENA_TIERS, getArena, HALF_W, PATH_WP } from './data.js';
+import { CARD_DEFS, MATCH_DURATION, CW, CH, CHEST_DEFS, STARTER_DECK, RACE_DEFS, ARENA_TIERS, getArena, HALF_W, PATH_WP, CELL, VALID_CELLS } from './data.js';
 import { cardThumbCanvas }         from './cardart.js';
 import { GameLoop, Particles, dist } from './engine.js';
 import { Unit, Tower, Projectile, buildTowers } from './entities.js';
@@ -9,17 +9,30 @@ import { UI }                      from './ui.js';
 import { Account }                 from './account.js';
 import { LocalBot, PracticeBot, MSG } from './network.js';
 
+// ── Nearest valid defender cell ───────────────────────────
+function _nearestValidCell(lx, ly, occupied) {
+  let best = null, bestD = Infinity;
+  for (const c of VALID_CELLS) {
+    if (occupied.has(`${c.cx},${c.cy}`)) continue;
+    const d = Math.hypot(lx - c.cx, ly - c.cy);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}
+
 // ── Game state container ──────────────────────────────────
 class State {
   constructor() {
-    this.units        = [];
-    this.projectiles  = [];
-    this.towers       = buildTowers();
-    this.timeLeft     = MATCH_DURATION;
-    this.overtime     = false;
-    this.oppName      = '';
-    this.stats        = { units: 0, damage: 0, towers: 0 };
-    this.activeSpells = [];
+    this.units          = [];
+    this.projectiles    = [];
+    this.towers         = buildTowers();
+    this.timeLeft       = MATCH_DURATION;
+    this.overtime       = false;
+    this.oppName        = '';
+    this.stats          = { units: 0, damage: 0, towers: 0 };
+    this.activeSpells   = [];
+    this.hovCell        = null;   // nearest valid cell under mouse cursor
+    this.showValidCells = false;  // true when defender card is selected + mouse on left side
   }
 }
 
@@ -43,6 +56,8 @@ class Game {
     this._wrPeriod          = 'all';
     this._coinMode          = 1;
     this._lobbyParticlesId  = null;
+    this._occupiedCells     = new Set();  // "cx,cy" keys for placed defenders
+    this._pendingCell       = null;       // cell chosen for current deploy
 
     this._wireAuthUI();
     this._wireMenuUI();
@@ -850,6 +865,7 @@ class Game {
     this.state        = new State();
     this.state.oppName = oppName;
     this._active      = true;
+    this._occupiedCells = new Set();
 
     this.economy.reset();
     this.economy.onChange = () => this.hand?.updateAffordability();
@@ -1021,10 +1037,28 @@ class Game {
         u._wpIdx = 0;
         u.x = PATH_WP[0].x + xOff + (Math.random() - 0.5) * 14;
         u.y = PATH_WP[0].y;
+      } else if (owner === 'ply' && this._pendingCell) {
+        // Player placed via grid snap
+        u.x = this._pendingCell.cx + xOff;
+        u.y = this._pendingCell.cy;
+        const key = `${this._pendingCell.cx},${this._pendingCell.cy}`;
+        this._occupiedCells.add(key);
+        u._cellKey = key;
       } else {
-        // Temp placement between path arms until grid drag is implemented
-        u.x = xOff + (lane === 0 ? 95 : 165) + (Math.random() - 0.5) * 18;
-        u.y = 160 + Math.round(Math.random() * 4) * 140 + (Math.random() - 0.5) * 18;
+        // Bot or fallback — pick nearest valid cell to a random hint position
+        const hintX = lane === 0 ? 95 : 165;
+        const hintY = 160 + Math.random() * 580;
+        const cell = _nearestValidCell(hintX, hintY, this._occupiedCells);
+        if (cell) {
+          u.x = cell.cx + xOff;
+          u.y = cell.cy;
+          const key = `${cell.cx},${cell.cy}`;
+          this._occupiedCells.add(key);
+          u._cellKey = key;
+        } else {
+          u.x = xOff + (lane === 0 ? 95 : 165) + (Math.random() - 0.5) * 18;
+          u.y = 160 + Math.round(Math.random() * 4) * 140 + (Math.random() - 0.5) * 18;
+        }
       }
       return u;
     };
@@ -1220,6 +1254,12 @@ class Game {
   }
 
   _cleanDead() {
+    for (const u of this.state.units) {
+      if (u.dead && u._cellKey) {
+        this._occupiedCells.delete(u._cellKey);
+        u._cellKey = null;
+      }
+    }
     this.state.units       = this.state.units.filter(u => !u.dead);
     this.state.projectiles = this.state.projectiles.filter(p => !p.dead);
   }
@@ -1460,6 +1500,32 @@ class Game {
 
   // ── Input: canvas deploy ───────────────────────────────────
   _wireCanvasDeploy() {
+    // Show valid cells + hover highlight while hovering with a defender selected
+    this.canvas.addEventListener('mousemove', e => {
+      if (!this._active || !this.state) return;
+      const def = this.hand?.selectedDef();
+      if (!def || def.type === 'enemy' || def.type === 'spell') {
+        this.state.showValidCells = false;
+        this.state.hovCell = null;
+        return;
+      }
+      const rect  = this.canvas.getBoundingClientRect();
+      const scale = this.renderer.scale;
+      const mx    = (e.clientX - rect.left) / scale;
+      const my    = (e.clientY - rect.top)  / scale;
+      if (mx >= HALF_W) {
+        this.state.showValidCells = false;
+        this.state.hovCell = null;
+        return;
+      }
+      this.state.showValidCells = true;
+      this.state.hovCell = _nearestValidCell(mx, my, this._occupiedCells);
+    });
+
+    this.canvas.addEventListener('mouseleave', () => {
+      if (this.state) { this.state.showValidCells = false; this.state.hovCell = null; }
+    });
+
     this.canvas.addEventListener('click', e => {
       if (!this._active || !this.hand?.hasSelected()) return;
       const def = this.hand.selectedDef();
@@ -1470,12 +1536,10 @@ class Game {
       const cx    = (e.clientX - rect.left)  / scale;
       const cy    = (e.clientY - rect.top)   / scale;
 
-      // Vertical split: left half = player defense, right half = opponent track
       const isRightSide = cx >= HALF_W;
-      const lane = 0;  // grid-based lane will replace this in a future phase
 
       if (def.type === 'spell') {
-        this.hand.tryDeploy(lane, { x: cx, y: cy });
+        this.hand.tryDeploy(0, { x: cx, y: cy });
         return;
       }
 
@@ -1490,13 +1554,17 @@ class Game {
         return;
       }
 
-      // Troops/buildings: click on left side to place on your defense grid
+      // Troops/buildings: snap to nearest valid cell on left side
       if (isRightSide) {
         this.ui.showDeployHint(true);
         setTimeout(() => this.ui.showDeployHint(false), 1500);
         return;
       }
+      const cell = _nearestValidCell(cx, cy, this._occupiedCells);
+      if (!cell) return;
+      this._pendingCell = cell;
       this.hand.tryDeploy(0);
+      this._pendingCell = null;
     });
 
     window.addEventListener('keydown', e => {

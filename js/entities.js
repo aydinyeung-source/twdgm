@@ -154,35 +154,9 @@ export class Unit {
     return this._isEnemy ? this._updateEnemy(dt, units, towers) : this._updateDefender(dt, units);
   }
 
-  // Enemies: follow path waypoints, stop to fight defenders in aggro range.
-  // When the last waypoint is passed they attack the base directly.
+  // Enemies: follow path waypoints continuously, never stopping for defenders.
+  // Defenders shoot enemies as they pass. At path end, attack the base directly.
   _updateEnemy(dt, units, towers) {
-    const hostile    = this.owner === 'ply' ? 'opp' : 'ply';
-    const aggroRange = this.r + 90;
-
-    // Fight a nearby defender on the same side
-    let unitTarget = null, unitTargetD = Infinity;
-    for (const u of units) {
-      if (u.dead || u.owner !== hostile || u._side !== this._side) continue;
-      if (u.cloakTimer > 0) continue;
-      if (u.flying && !this.antiAir) continue;
-      const d = dist(this.x, this.y, u.x, u.y);
-      if (d < aggroRange && d < unitTargetD) { unitTargetD = d; unitTarget = u; }
-    }
-
-    if (unitTarget) {
-      this.state = 'fight';
-      const d = dist(this.x, this.y, unitTarget.x, unitTarget.y);
-      if (d <= this.attackRange + unitTarget.r && this.cooldown <= 0) {
-        this.cooldown = this.rate; this.flashTimer = 100;
-        return { action: 'attack', target: unitTarget };
-      }
-      const dx = unitTarget.x - this.x, dy = unitTarget.y - this.y;
-      const mag = Math.hypot(dx, dy);
-      if (mag > 1) { this.x += (dx/mag)*this.speed*dt; this.y += (dy/mag)*this.speed*dt; }
-      return null;
-    }
-
     // At last waypoint – attack the base tower
     if (this._wpIdx >= PATH_WP.length) {
       this.state = 'fight';
