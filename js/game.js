@@ -342,9 +342,19 @@ class Game {
     if (!modal) return;
     modal.classList.remove('hidden');
 
-    // Art
+    // Art with elixir badge (top-left, like Clash)
     const artEl = document.getElementById('modal-art');
-    if (artEl) { artEl.innerHTML = ''; artEl.appendChild(cardThumbCanvas(cardId, 128)); }
+    if (artEl) {
+      artEl.innerHTML = '';
+      const wrap = document.createElement('div');
+      wrap.className = 'modal-art-wrap';
+      const badge = document.createElement('div');
+      badge.className = 'modal-elixir-badge';
+      badge.textContent = def.cost;
+      wrap.appendChild(cardThumbCanvas(cardId, 128));
+      wrap.appendChild(badge);
+      artEl.appendChild(wrap);
+    }
 
     // Name
     const nameEl = document.getElementById('modal-name');
@@ -382,7 +392,6 @@ class Game {
         statsEl.innerHTML =
           ms(hp,        'HP')         +
           ms(def.speed, 'Speed')      +
-          ms(def.cost,  'Elixir')     +
           (isKamikaze
             ? ms(sp.blastDmg, 'Blast DMG') + ms(sp.blastR, 'Blast Radius') + ms((sp.stunMs/1000).toFixed(1)+'s', 'Stun')
             : ms(dmg, 'Damage') + ms(dmg, 'Troop DMG') + ms(atkRate, 'ATK Rate')
@@ -391,21 +400,30 @@ class Game {
           (isPack  ? ms('×' + sp.count,                      'Pack')   : '') +
           (isCloak ? ms((sp.durationMs/1000).toFixed(1)+'s', 'Cloak')  : '') +
           (def.flying  ? ms('Yes', 'Flying') : '');
-      } else {
-        const atkRate = def.rate && def.rate < 9000 ? (def.rate / 1000).toFixed(1) + 's' : '—';
+      } else if (def.type === 'spell') {
         const sp = def.special;
+        const radius   = sp?.radius   ?? sp?.splashR ?? 0;
+        const duration = sp?.duration ?? sp?.durationMs ?? 0;
         statsEl.innerHTML =
-          (hp  ? ms(hp,  'HP')      : '') +
-          (dmg ? ms(dmg, 'Damage')  : '') +
-          (def.speed ? ms(def.speed, 'Speed') : '') +
-          ms(def.cost, 'Elixir')          +
+          (dmg    ? ms(dmg,   'Damage')   : '') +
+          (radius ? ms(radius, 'Radius')  : '') +
+          (duration ? ms((duration/1000).toFixed(1)+'s', 'Duration') : '');
+      } else {
+        // Troop / Building
+        const sp      = def.special;
+        const range   = def.r + 20 + (sp?.extraRange ?? 0);
+        const atkRate = def.rate && def.rate < 9000 ? (def.rate / 1000).toFixed(1) + 's' : '—';
+        const targets = def.antiAir ? 'Air & Ground' : 'Ground';
+        statsEl.innerHTML =
+          ms(hp, 'HP') +
+          (dmg ? ms(dmg, 'Damage') : '') +
           (def.rate && def.rate < 9000 ? ms(atkRate, 'ATK Rate') : '') +
-          (sp?.splashR  ? ms(sp.splashR,  'Splash R') : '') +
-          (sp?.auraR    ? ms(sp.auraR,    'Aura R')   : '') +
-          (sp?.hps      ? ms(sp.hps + '/s','Heal')    : '') +
-          (sp?.extraRange ? ms(sp.extraRange, 'Extra Range') : '') +
-          (sp?.elixirRate ? ms('+' + sp.elixirRate + ' / ' + (sp.intervalMs/1000).toFixed(0) + 's', 'Income') : '') +
-          (def.antiAir  ? ms('Yes', 'Anti-Air') : '');
+          ms(range,   'Range')   +
+          ms(targets, 'Targets') +
+          (sp?.splashR    ? ms(sp.splashR,  'Splash R')  : '') +
+          (sp?.auraR      ? ms(sp.auraR,    'Aura R')    : '') +
+          (sp?.hps        ? ms(sp.hps+'/s', 'Heal/s')    : '') +
+          (sp?.elixirRate ? ms('+'+sp.elixirRate+' / '+sp.intervalMs/1000+'s', 'Income') : '');
       }
     }
 
@@ -654,7 +672,7 @@ class Game {
           if (!canAfford || arenaLocked) return;
           const result = this.account.openChest(chest.id);
           if (result.ok) {
-            this._showChestResult(result.results);
+            this._showChestResult(result.results, chest);
             this._renderShopTab();
           }
         });
@@ -707,15 +725,78 @@ class Game {
     }
   }
 
-  _showChestResult(results) {
-    const copyLines = results
-      .filter(r => r.type === 'card')
-      .map(r => `+1 ${CARD_DEFS[r.id]?.name ?? r.id} copy`);
-    const coins = results.filter(r => r.type === 'coins').reduce((a, r) => a + r.amount, 0);
-    let msg = copyLines.join('\n');
-    if (coins) msg += (msg ? '\n' : '') + `Coin refund: ${coins}`;
-    if (!msg)  msg = 'Chest opened!';
-    setTimeout(() => alert(msg), 50);
+  _showChestResult(results, chest) {
+    const screen = document.getElementById('screen-menu');
+    if (!screen) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'chest-open-overlay';
+
+    const title = document.createElement('div');
+    title.className = 'chest-open-title';
+    title.textContent = (chest?.name?.toUpperCase() ?? 'CHEST') + ' OPENED!';
+
+    // Chest canvas + shake animation
+    const animWrap = document.createElement('div');
+    animWrap.className = 'chest-open-animwrap';
+    const chestCanvas = _drawChestIcon(chest ?? { color: '#b45309', glow: '#f59e0b' }, 96);
+    chestCanvas.className = 'chest-anim-canvas chest-shake';
+    animWrap.appendChild(chestCanvas);
+
+    // Card results grid (hidden until burst)
+    const cardsGrid = document.createElement('div');
+    cardsGrid.className = 'chest-cards-grid hidden';
+
+    const cardResults = results.filter(r => r.type === 'card');
+    const coinTotal   = results.filter(r => r.type === 'coins').reduce((a, r) => a + r.amount, 0);
+
+    cardResults.forEach((r, i) => {
+      const def = CARD_DEFS[r.id];
+      if (!def) return;
+      const el = document.createElement('div');
+      el.className = 'chest-card-item';
+      el.style.animationDelay = `${i * 80}ms`;
+      const cv = cardThumbCanvas(r.id, 72);
+      cv.style.cssText = 'border-radius:10px;width:72px;height:72px;display:block;';
+      const nameLbl = document.createElement('div');
+      nameLbl.className = 'chest-card-name';
+      nameLbl.textContent = def.name;
+      const copyLbl = document.createElement('div');
+      copyLbl.className = 'chest-card-copy';
+      copyLbl.textContent = '+1 copy';
+      el.appendChild(cv);
+      el.appendChild(nameLbl);
+      el.appendChild(copyLbl);
+      cardsGrid.appendChild(el);
+    });
+
+    if (coinTotal) {
+      const coinEl = document.createElement('div');
+      coinEl.className = 'chest-coin-refund';
+      coinEl.textContent = `+${coinTotal} coins refunded`;
+      cardsGrid.appendChild(coinEl);
+    }
+
+    const collectBtn = document.createElement('button');
+    collectBtn.className = 'chest-collect-btn hidden';
+    collectBtn.textContent = 'COLLECT';
+    collectBtn.addEventListener('click', () => overlay.remove());
+
+    overlay.appendChild(title);
+    overlay.appendChild(animWrap);
+    overlay.appendChild(cardsGrid);
+    overlay.appendChild(collectBtn);
+    screen.appendChild(overlay);
+
+    // Sequence: shake → burst flash → show cards
+    setTimeout(() => {
+      chestCanvas.classList.replace('chest-shake', 'chest-burst');
+      setTimeout(() => {
+        animWrap.style.display = 'none';
+        cardsGrid.classList.remove('hidden');
+        collectBtn.classList.remove('hidden');
+      }, 420);
+    }, 500);
   }
 
   // ── Matchmaking ───────────────────────────────────────────
