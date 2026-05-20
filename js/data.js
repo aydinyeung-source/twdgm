@@ -149,7 +149,7 @@ export const CARD_DEFS = {
     color: '#eab308', glow: '#facc15',
     desc: 'Spawns 3 at once. Overwhelm them.',
     tradeoff: 'One Torrent wipes the whole pack instantly.',
-    counters: ['splasher'],
+    counters: ['grunt'],
     special: { type: 'pack', count: 3 },
   },
 
@@ -161,7 +161,7 @@ export const CARD_DEFS = {
     color: '#8b5cf6', glow: '#a78bfa',
     desc: 'Massive tank. Hard to stop.',
     tradeoff: 'So slow that Piercers and Fury shred it before it arrives.',
-    counters: ['sniper', 'tank'],
+    counters: ['sniper', 'grunt'],
     special: null,
   },
 
@@ -173,7 +173,7 @@ export const CARD_DEFS = {
     color: '#ef4444', glow: '#f87171',
     desc: 'Fragile but deals enormous damage.',
     tradeoff: 'Any AOE or fast troop deletes it instantly.',
-    counters: ['shield_bearer', 'splasher'],
+    counters: ['grunt', 'splasher'],
     special: null,
   },
 
@@ -185,7 +185,7 @@ export const CARD_DEFS = {
     color: '#f59e0b', glow: '#fbbf24',
     desc: 'Explodes on contact. Stuns nearby troops.',
     tradeoff: 'Slow troops tank it. One Torrent neutralises the whole threat.',
-    counters: ['tank', 'splasher'],
+    counters: ['grunt', 'splasher'],
     special: { type: 'kamikaze', blastR: 88, blastDmg: 32, stunMs: 2000 },
   },
 
@@ -197,21 +197,21 @@ export const CARD_DEFS = {
     color: '#475569', glow: '#64748b',
     desc: 'Invisible for 3 sec after spawning.',
     tradeoff: 'Cloak ends the moment it enters tower range. Below-average raw stats.',
-    counters: ['splasher', 'healer'],
+    counters: ['splasher', 'sniper'],
     special: { type: 'cloak', durationMs: 3000 },
   },
 
   // ── AIR ENEMY CARDS ────────────────────────────────────────
 
   wasp: {
-    id: 'wasp', name: 'DRONE', type: 'enemy', cost: 4,
+    id: 'wasp', name: 'DRONE', type: 'enemy', cost: 6,
     rarity: 'common', arenaUnlock: 0, race: 'gremlin',
     flying: true,
     hp: 22,  speed: 200, dmg: 5,  rate: 850,  r: 14,
     color: '#84cc16', glow: '#a3e635',
     desc: 'Pack of 3 flying drones. Bypasses ground troops.',
     tradeoff: 'Any anti-air troop hard-counters the whole pack.',
-    counters: ['archer', 'aegis'],
+    counters: ['archer'],
     special: { type: 'pack', count: 3 },
   },
 
@@ -223,7 +223,7 @@ export const CARD_DEFS = {
     color: '#6366f1', glow: '#818cf8',
     desc: 'Fast flying unit. Ground troops cannot touch it.',
     tradeoff: 'Interceptor hard-counters it. Low HP for its cost.',
-    counters: ['archer', 'aegis'],
+    counters: ['archer'],
     special: { type: 'cloak', durationMs: 2000 },
   },
 

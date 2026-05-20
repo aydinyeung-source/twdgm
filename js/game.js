@@ -251,8 +251,9 @@ class Game {
         sec.innerHTML = `<div class="deck-section-label">${label}</div>`;
         const row = document.createElement('div');
         row.className = 'deck-section-row';
-        const slotCount = Math.max(arr.length + 1, 4);
-        for (let i = 0; i < Math.min(slotCount, maxSlots); i++) {
+        // Only show + slot if not yet at max
+        const slotCount = arr.length < maxSlots ? Math.max(arr.length + 1, 4) : arr.length;
+        for (let i = 0; i < slotCount; i++) {
           const slot = document.createElement('div');
           slot.className = 'deck-slot';
           if (arr[i]) {
@@ -261,11 +262,12 @@ class Game {
             const lvl = this.account.getCardLevel(cardId);
             slot.classList.add('filled');
             slot.innerHTML = `
+              <div class="dc-cost">${def.cost}</div>
               <div class="dc-icon"></div>
               <div class="dc-name">${def.name}</div>
               ${lvl > 1 ? `<div class="dc-level">Lv${lvl}</div>` : ''}
             `;
-            slot.querySelector('.dc-icon').appendChild(cardThumbCanvas(cardId, 32));
+            slot.querySelector('.dc-icon').appendChild(cardThumbCanvas(cardId, 80));
             slot.addEventListener('click', () => {
               this._editDeck.delete(cardId);
               this._redrawDeckTab(unlocked);
@@ -286,25 +288,34 @@ class Game {
       const collEl = document.getElementById(gridId);
       if (!collEl) return;
       collEl.innerHTML = '';
-      for (const [id, def] of Object.entries(CARD_DEFS)) {
-        if (!filterFn(def)) continue;
+      // Unlocked cards first, locked/undiscovered at bottom
+      const entries = Object.entries(CARD_DEFS)
+        .filter(([, def]) => filterFn(def))
+        .sort(([aId], [bId]) => {
+          const aLocked = !unlocked.has(aId);
+          const bLocked = !unlocked.has(bId);
+          return aLocked - bLocked;
+        });
+      for (const [id, def] of entries) {
         const isUnlocked = unlocked.has(id);
         const isInDeck   = this._editDeck.has(id);
         const lvl        = this.account.getCardLevel(id);
         const el = document.createElement('div');
-        el.className = ['coll-card', `rarity-${def.rarity}`, isInDeck ? 'in-deck' : '', !isUnlocked ? 'locked' : ''].filter(Boolean).join(' ');
+        el.className = ['coll-card', isInDeck ? 'in-deck' : '', !isUnlocked ? 'locked' : ''].filter(Boolean).join(' ');
         const raceCol = RACE_DEFS[def.race]?.color ?? '#888';
         el.style.setProperty('--race-color', raceCol);
         el.innerHTML = `
           <div class="cc-cost">${def.cost}</div>
           ${lvl > 1 ? `<div class="cc-level-badge">Lv${lvl}</div>` : ''}
           <div class="cc-icon"></div>
-          <div class="cc-name">${def.name}</div>
-          <div class="cc-race">${RACE_DEFS[def.race]?.name ?? (def.type === 'spell' ? 'SPELL' : def.type === 'building' ? 'STRUCTURE' : '')}</div>
+          <div class="cc-info">
+            <div class="cc-name">${def.name}</div>
+            <div class="cc-race">${RACE_DEFS[def.race]?.name ?? (def.type === 'spell' ? 'SPELL' : def.type === 'building' ? 'STRUCTURE' : '')}</div>
+          </div>
           ${!isUnlocked ? '<div class="cc-lock">&#128274;</div>' : ''}
           ${isInDeck    ? '<div class="cc-check">&#10003;</div>' : ''}
         `;
-        el.querySelector('.cc-icon').appendChild(cardThumbCanvas(id, 32));
+        el.querySelector('.cc-icon').appendChild(cardThumbCanvas(id, 72));
         if (isUnlocked) el.addEventListener('click', () => this._openCardModal(id, unlocked));
         collEl.appendChild(el);
       }
@@ -333,7 +344,7 @@ class Game {
 
     // Art
     const artEl = document.getElementById('modal-art');
-    if (artEl) { artEl.innerHTML = ''; artEl.appendChild(cardThumbCanvas(cardId, 96)); }
+    if (artEl) { artEl.innerHTML = ''; artEl.appendChild(cardThumbCanvas(cardId, 128)); }
 
     // Name
     const nameEl = document.getElementById('modal-name');
@@ -356,32 +367,55 @@ class Game {
     // Stats
     const lvl = this.account.getCardLevel(cardId);
     const mult = 1 + (lvl - 1) * 0.1;
-    const hp = Math.round(def.hp * mult);
+    const hp  = Math.round(def.hp  * mult);
     const dmg = Math.round(def.dmg * mult);
     const statsEl = document.getElementById('modal-stats');
     if (statsEl) {
-      statsEl.innerHTML = `
-        <div class="ms-box"><div class="ms-val">${hp}</div><div class="ms-lbl">HP</div></div>
-        <div class="ms-box"><div class="ms-val">${dmg}</div><div class="ms-lbl">DMG</div></div>
-        <div class="ms-box"><div class="ms-val">${def.speed}</div><div class="ms-lbl">SPD</div></div>
-        <div class="ms-box"><div class="ms-val">${def.cost}</div><div class="ms-lbl">Cost</div></div>
-        <div class="ms-box"><div class="ms-val">${(def.rate / 1000).toFixed(1)}s</div><div class="ms-lbl">ATK SPD</div></div>
-        <div class="ms-box"><div class="ms-val">${def.rarity[0].toUpperCase()}</div><div class="ms-lbl">Rarity</div></div>
-      `;
+      const ms = (val, lbl) => `<div class="ms-box"><div class="ms-val">${val}</div><div class="ms-lbl">${lbl}</div></div>`;
+      if (def.type === 'enemy') {
+        const sp = def.special;
+        const isKamikaze = sp?.type === 'kamikaze';
+        const isPack     = sp?.type === 'pack';
+        const isCloak    = sp?.type === 'cloak';
+        const range      = def.r + 20 + (sp?.extraRange ?? 0);
+        const atkRate    = def.rate < 9000 ? (def.rate / 1000).toFixed(1) + 's' : '—';
+        statsEl.innerHTML =
+          ms(hp,        'HP')         +
+          ms(def.speed, 'Speed')      +
+          ms(def.cost,  'Elixir')     +
+          (isKamikaze
+            ? ms(sp.blastDmg, 'Blast DMG') + ms(sp.blastR, 'Blast Radius') + ms((sp.stunMs/1000).toFixed(1)+'s', 'Stun')
+            : ms(dmg, 'Damage') + ms(dmg, 'Troop DMG') + ms(atkRate, 'ATK Rate')
+          ) +
+          ms(range,     'Range')      +
+          (isPack  ? ms('×' + sp.count,                      'Pack')   : '') +
+          (isCloak ? ms((sp.durationMs/1000).toFixed(1)+'s', 'Cloak')  : '') +
+          (def.flying  ? ms('Yes', 'Flying') : '');
+      } else {
+        const atkRate = def.rate && def.rate < 9000 ? (def.rate / 1000).toFixed(1) + 's' : '—';
+        const sp = def.special;
+        statsEl.innerHTML =
+          (hp  ? ms(hp,  'HP')      : '') +
+          (dmg ? ms(dmg, 'Damage')  : '') +
+          (def.speed ? ms(def.speed, 'Speed') : '') +
+          ms(def.cost, 'Elixir')          +
+          (def.rate && def.rate < 9000 ? ms(atkRate, 'ATK Rate') : '') +
+          (sp?.splashR  ? ms(sp.splashR,  'Splash R') : '') +
+          (sp?.auraR    ? ms(sp.auraR,    'Aura R')   : '') +
+          (sp?.hps      ? ms(sp.hps + '/s','Heal')    : '') +
+          (sp?.extraRange ? ms(sp.extraRange, 'Extra Range') : '') +
+          (sp?.elixirRate ? ms('+' + sp.elixirRate + ' / ' + (sp.intervalMs/1000).toFixed(0) + 's', 'Income') : '') +
+          (def.antiAir  ? ms('Yes', 'Anti-Air') : '');
+      }
     }
 
     // Desc
     const descEl = document.getElementById('modal-desc');
     if (descEl) descEl.textContent = def.desc ?? '';
 
-    // Counter row (for enemy cards)
+    // Hide counter row — counters exist in data but are not shown
     const counterEl = document.getElementById('modal-counter-row');
-    if (counterEl) {
-      if (def.counters?.length) {
-        const names = def.counters.map(id => CARD_DEFS[id]?.name ?? id).join(', ');
-        counterEl.innerHTML = `Countered by: <span>${names}</span>`;
-      } else { counterEl.textContent = ''; }
-    }
+    if (counterEl) counterEl.textContent = '';
 
     // Equip button
     this._refreshModalEquipBtn(cardId);
