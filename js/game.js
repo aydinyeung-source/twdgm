@@ -417,6 +417,7 @@ class Game {
         const atkType = (!def.dmg || def.rate >= 9000) ? 'Passive'
           : sp?.type === 'splash'    ? 'Splash'
           : sp?.type === 'kamikaze'  ? 'AOE on Death'
+          : sp?.type === 'spawner'   ? 'Spawner'
           : sp?.type === 'long_range'? 'Ranged'
           : 'Melee';
         statsEl.innerHTML =
