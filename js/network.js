@@ -149,18 +149,25 @@ const BOT_NAMES = [
 ];
 function _botName() { return BOT_NAMES[randInt(0, BOT_NAMES.length - 1)]; }
 
-// ── Practice bot (reacts to player, counter-pushes, lane pressure) ────────
+// ── Practice bot ─────────────────────────────────────────────────────────────
+// This is a PvP tower defense: enemies you spawn go to the opponent's territory
+// and attack their towers; troops/buildings you place defend your own territory.
+// PracticeBot mimics a human: sends enemy waves offensively, and responds to
+// player enemy deploys by placing a troop/building on its own side to defend.
+const BOT_DEFENDER_IDS = Object.keys(CARD_DEFS).filter(
+  id => CARD_DEFS[id].type === 'troop' || CARD_DEFS[id].type === 'building'
+);
+
 export class PracticeBot extends NetworkClient {
   constructor() {
     super();
-    this.connected       = true;
-    this._botElixir      = 20;
-    this._botTimer       = 0;
-    this._botInterval    = null;
-    this._gameTime       = 0;
-    this._nextPlay       = _practiceBotDelay('early');
-    this._counterPush    = null; // { lane, cardsLeft, delay }
-    this._lastPlayerLane = 0;
+    this.connected        = true;
+    this._botElixir       = 20;
+    this._offenseTimer    = 0;
+    this._nextOffense     = _practiceBotDelay('early');
+    this._botInterval     = null;
+    this._gameTime        = 0;
+    this._pendingDefense  = []; // { lane, delay, maxCost }
   }
 
   connect()    { return Promise.resolve(); }
@@ -176,17 +183,18 @@ export class PracticeBot extends NetworkClient {
 
   cancelMatch() { clearInterval(this._botInterval); this._botInterval = null; }
 
+  // Called when the player plays a card.
+  // If it's an enemy card, the player is attacking our territory → place a defender.
   deploy(cardId, lane) {
-    const cost = CARD_DEFS[cardId]?.cost ?? 3;
-    this._lastPlayerLane = lane;
-    // Big play triggers counter-push in opposite lane
-    if (cost >= 4 && !this._counterPush) {
-      this._counterPush = {
-        lane:      1 - lane,
-        cardsLeft: cost >= 6 ? 3 : 2,
-        delay:     0.8 + Math.random() * 0.7,
-      };
-    }
+    const def = CARD_DEFS[cardId];
+    if (!def || def.type !== 'enemy') return;
+    // Only queue defense if we don't already have one pending for this lane
+    if (this._pendingDefense.some(d => d.lane === lane)) return;
+    this._pendingDefense.push({
+      lane,
+      delay:   1.0 + Math.random() * 1.2,   // human-like reaction delay
+      maxCost: Math.max(3, def.cost - 1),    // spend proportional to threat
+    });
   }
 
   _startBotLoop() {
@@ -201,28 +209,25 @@ export class PracticeBot extends NetworkClient {
   }
 
   _botTick(dt) {
-    this._botElixir = Math.min(25, this._botElixir + 1.0 * dt);
-    this._botTimer += dt;
-    this._gameTime += dt;
+    this._botElixir  = Math.min(25, this._botElixir + 1.0 * dt);
+    this._offenseTimer += dt;
+    this._gameTime   += dt;
 
-    // Counter-push: send cheap fast cards quickly in opposite lane
-    if (this._counterPush) {
-      this._counterPush.delay -= dt;
-      if (this._counterPush.delay <= 0 && this._counterPush.cardsLeft > 0) {
-        const pool = BOT_ENEMY_IDS.filter(id => CARD_DEFS[id].cost <= Math.min(this._botElixir, 4));
-        if (pool.length) {
-          const cardId = pool[Math.floor(Math.random() * pool.length)];
-          this._botElixir -= CARD_DEFS[cardId].cost;
-          this._counterPush.cardsLeft--;
-          this._counterPush.delay = 0.5 + Math.random() * 0.5;
-          this._dispatch({ type: MSG.OPP_DEPLOY, cardId, lane: this._counterPush.lane });
-        }
-        if (this._counterPush.cardsLeft <= 0) this._counterPush = null;
+    // Defense: respond to player enemy deploys by placing a troop/building
+    for (let i = this._pendingDefense.length - 1; i >= 0; i--) {
+      const pd = this._pendingDefense[i];
+      pd.delay -= dt;
+      if (pd.delay > 0) continue;
+      const defender = _pickDefender(this._botElixir, pd.maxCost);
+      if (defender) {
+        this._botElixir -= CARD_DEFS[defender].cost;
+        this._dispatch({ type: MSG.OPP_DEPLOY, cardId: defender, lane: pd.lane });
       }
-      return;
+      this._pendingDefense.splice(i, 1);
     }
 
-    if (this._botTimer < this._nextPlay) return;
+    // Offense: send enemy waves at the player
+    if (this._offenseTimer < this._nextOffense) return;
 
     const phase = this._phase();
     const minCost = phase === 'late' ? 3 : 1;
@@ -232,7 +237,7 @@ export class PracticeBot extends NetworkClient {
     });
     if (!affordable.length) return;
 
-    // Early: favour cheap cards; late: favour heavy cards
+    // Early game: prefer cheap fast cards; late game: prefer heavy hitters
     const weights = affordable.map(id => {
       const cost = CARD_DEFS[id].cost;
       return phase === 'late' ? cost * cost : Math.max(1, 7 - cost);
@@ -245,15 +250,24 @@ export class PracticeBot extends NetworkClient {
       if (rnd <= 0) { cardId = affordable[i]; break; }
     }
 
-    // Alternate lanes every ~15s, with some randomness
-    const preferLane = Math.floor(this._gameTime / 15) % 2;
-    const lane = Math.random() < 0.65 ? preferLane : 1 - preferLane;
+    // Alternate pressure between lanes every ~20s
+    const preferLane = Math.floor(this._gameTime / 20) % 2;
+    const lane = Math.random() < 0.7 ? preferLane : 1 - preferLane;
 
-    this._botElixir -= CARD_DEFS[cardId].cost;
-    this._botTimer   = 0;
-    this._nextPlay   = _practiceBotDelay(phase);
+    this._botElixir   -= CARD_DEFS[cardId].cost;
+    this._offenseTimer = 0;
+    this._nextOffense  = _practiceBotDelay(phase);
     this._dispatch({ type: MSG.OPP_DEPLOY, cardId, lane });
   }
+}
+
+// Pick a troop/building to defend with — closest cost to maxCost without exceeding it
+function _pickDefender(elixirAvail, maxCost) {
+  const budget = Math.min(elixirAvail, maxCost);
+  const options = BOT_DEFENDER_IDS.filter(id => CARD_DEFS[id].cost <= budget);
+  if (!options.length) return null;
+  // Prefer the most expensive affordable option (best bang for the buck)
+  return options.sort((a, b) => CARD_DEFS[b].cost - CARD_DEFS[a].cost)[0];
 }
 
 function _practiceBotDelay(phase) {
