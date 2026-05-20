@@ -38,10 +38,11 @@ class Game {
     this.state    = null;
     this._active  = false;
 
-    this._editDeck    = null;
-    this._modalCardId = null;
-    this._wrPeriod    = 'all';
-    this._coinMode    = 1;
+    this._editDeck          = null;
+    this._modalCardId       = null;
+    this._wrPeriod          = 'all';
+    this._coinMode          = 1;
+    this._lobbyParticlesId  = null;
 
     this._wireAuthUI();
     this._wireMenuUI();
@@ -109,6 +110,7 @@ class Game {
     this.ui.show('menu');
     this._updateFriendsBadge();
     this._updateModeDisplay();
+    this._startLobbyParticles();
   }
 
   _updateBattleTab() {
@@ -126,11 +128,11 @@ class Game {
       ? `${arenaInfo.min}+ trophies`
       : `${arenaInfo.min} – ${arenaInfo.max} trophies`;
 
-    const deck     = u.deck ?? [];
-    const enemies  = deck.filter(id => CARD_DEFS[id]?.type === 'enemy').length;
-    const defense  = deck.filter(id => ['troop','spell'].includes(CARD_DEFS[id]?.type)).length;
-    const valid    = enemies === 6 && defense === 6;
-    const warning  = document.getElementById('battle-deck-warning');
+    const deck    = u.deck ?? [];
+    const enemies = deck.filter(id => CARD_DEFS[id]?.type === 'enemy').length;
+    const troops  = deck.filter(id => CARD_DEFS[id]?.type === 'troop').length;
+    const valid   = deck.length === 12 && enemies >= 2 && troops >= 2;
+    const warning = document.getElementById('battle-deck-warning');
     if (warning) warning.classList.toggle('hidden', valid);
   }
 
@@ -149,10 +151,10 @@ class Game {
 
     document.getElementById('btn-battle')?.addEventListener('click', () => this._startMatchmaking());
     document.getElementById('btn-logout')?.addEventListener('click', () => {
+      this._stopLobbyParticles();
       this.account.logout();
       this.ui.show('auth');
     });
-    document.getElementById('btn-save-deck')?.addEventListener('click', () => this._saveDeck());
 
     // Arena tiers button on battle tab
     document.getElementById('btn-arena-tiers')?.addEventListener('click', () => this._openArenaModal());
@@ -229,26 +231,28 @@ class Game {
 
   _redrawDeckTab(unlocked) {
     const deckArr = [...this._editDeck];
-    const enemies  = deckArr.filter(id => CARD_DEFS[id]?.type === 'enemy');
-    const troops   = deckArr.filter(id => CARD_DEFS[id]?.type === 'troop');
-    const defense  = deckArr.filter(id => ['troop','spell','building'].includes(CARD_DEFS[id]?.type));
-    const valid    = deckArr.length === 12 && enemies.length >= 2 && troops.length >= 2;
+    const enemies = deckArr.filter(id => CARD_DEFS[id]?.type === 'enemy');
+    const troops  = deckArr.filter(id => CARD_DEFS[id]?.type === 'troop');
+    const defense = deckArr.filter(id => ['troop','spell','building'].includes(CARD_DEFS[id]?.type));
+    const valid   = deckArr.length === 12 && enemies.length >= 2 && troops.length >= 2;
+
+    // Autosave when valid
+    if (valid) this.account.saveDeck(deckArr);
 
     const deckCountEl = document.getElementById('deck-count');
-    const saveBtn     = document.getElementById('btn-save-deck');
-    if (deckCountEl) deckCountEl.textContent = `${deckArr.length}/12 cards · ${enemies.length} enemies · ${defense.length} defense`;
-    if (saveBtn) saveBtn.disabled = !valid;
+    if (deckCountEl) deckCountEl.textContent = `${deckArr.length}/12 · ${enemies.length} enemies · ${defense.length} defense`;
 
     const slotsEl = document.getElementById('deck-slots');
     if (slotsEl) {
       slotsEl.innerHTML = '';
-      const makeRow = (label, arr) => {
+      const makeRow = (label, arr, maxSlots) => {
         const sec = document.createElement('div');
         sec.className = 'deck-section';
         sec.innerHTML = `<div class="deck-section-label">${label}</div>`;
         const row = document.createElement('div');
         row.className = 'deck-section-row';
-        for (let i = 0; i < 6; i++) {
+        const slotCount = Math.max(arr.length + 1, 4);
+        for (let i = 0; i < Math.min(slotCount, maxSlots); i++) {
           const slot = document.createElement('div');
           slot.className = 'deck-slot';
           if (arr[i]) {
@@ -274,18 +278,19 @@ class Game {
         sec.appendChild(row);
         return sec;
       };
-      slotsEl.appendChild(makeRow('ENEMIES', enemies));
-      slotsEl.appendChild(makeRow('DEFENSE', defense));
+      slotsEl.appendChild(makeRow('ENEMIES', enemies, 10));
+      slotsEl.appendChild(makeRow('TROOPS & DEFENSE', defense, 10));
     }
 
-    const collEl = document.getElementById('card-collection');
-    if (collEl) {
+    const makeCollGrid = (gridId, filterFn) => {
+      const collEl = document.getElementById(gridId);
+      if (!collEl) return;
       collEl.innerHTML = '';
       for (const [id, def] of Object.entries(CARD_DEFS)) {
+        if (!filterFn(def)) continue;
         const isUnlocked = unlocked.has(id);
         const isInDeck   = this._editDeck.has(id);
         const lvl        = this.account.getCardLevel(id);
-        const copies     = this.account.getCardCopies(id);
         const el = document.createElement('div');
         el.className = ['coll-card', `rarity-${def.rarity}`, isInDeck ? 'in-deck' : '', !isUnlocked ? 'locked' : ''].filter(Boolean).join(' ');
         const raceCol = RACE_DEFS[def.race]?.color ?? '#888';
@@ -295,29 +300,17 @@ class Game {
           ${lvl > 1 ? `<div class="cc-level-badge">Lv${lvl}</div>` : ''}
           <div class="cc-icon"></div>
           <div class="cc-name">${def.name}</div>
-          <div class="cc-race">${RACE_DEFS[def.race]?.name ?? ''}</div>
+          <div class="cc-race">${RACE_DEFS[def.race]?.name ?? (def.type === 'spell' ? 'SPELL' : def.type === 'building' ? 'STRUCTURE' : '')}</div>
           ${!isUnlocked ? '<div class="cc-lock">&#128274;</div>' : ''}
           ${isInDeck    ? '<div class="cc-check">&#10003;</div>' : ''}
         `;
         el.querySelector('.cc-icon').appendChild(cardThumbCanvas(id, 32));
-        if (isUnlocked) {
-          el.addEventListener('click', () => this._openCardModal(id, unlocked));
-        }
+        if (isUnlocked) el.addEventListener('click', () => this._openCardModal(id, unlocked));
         collEl.appendChild(el);
       }
-    }
-  }
-
-  _saveDeck() {
-    if (!this._editDeck) return;
-    const arr     = [...this._editDeck];
-    const enemies = arr.filter(id => CARD_DEFS[id]?.type === 'enemy').length;
-    const troops  = arr.filter(id => CARD_DEFS[id]?.type === 'troop').length;
-    if (arr.length !== 12 || enemies < 2 || troops < 2) return;
-    this.account.saveDeck(arr);
-    const btn = document.getElementById('btn-save-deck');
-    if (btn) { btn.textContent = 'Saved!'; setTimeout(() => { btn.textContent = 'Save Deck'; }, 1500); }
-    this._updateBattleTab();
+    };
+    makeCollGrid('card-collection-enemies', d => d.type === 'enemy');
+    makeCollGrid('card-collection-defense', d => ['troop','spell','building'].includes(d.type));
   }
 
   // ── Card Modal ────────────────────────────────────────────
@@ -522,14 +515,26 @@ class Game {
       const current  = trophies >= tier.min && (tier.max === Infinity || trophies <= tier.max);
       const row = document.createElement('div');
       row.className = ['arena-tier-row', current ? 'current' : '', unlocked ? 'unlocked' : ''].filter(Boolean).join(' ');
-      row.innerHTML = `
-        <div class="arena-tier-icon">${tier.icon}</div>
-        <div class="arena-tier-info">
-          <div class="arena-tier-name" style="color:${tier.color}">${tier.name}</div>
-          <div class="arena-tier-range">${tier.max === Infinity ? `${tier.min}+ trophies` : `${tier.min} – ${tier.max}`}</div>
-        </div>
-        <div class="arena-tier-badge ${current ? 'current-lbl' : 'locked-lbl'}">${current ? 'CURRENT' : unlocked ? 'CLEARED' : 'LOCKED'}</div>
+
+      const iconCanvas = _drawArenaIconCanvas(tier.arenaType, tier.color, 28);
+
+      const info = document.createElement('div');
+      info.className = 'arena-tier-info';
+      info.innerHTML = `
+        <div class="arena-tier-name" style="color:${tier.color}">${tier.name}</div>
+        <div class="arena-tier-range">${tier.max === Infinity ? `${tier.min}+ trophies` : `${tier.min} – ${tier.max}`}</div>
       `;
+      const badge = document.createElement('div');
+      badge.className = `arena-tier-badge ${current ? 'current-lbl' : 'locked-lbl'}`;
+      badge.textContent = current ? 'CURRENT' : unlocked ? 'CLEARED' : 'LOCKED';
+
+      const iconWrap = document.createElement('div');
+      iconWrap.className = 'arena-tier-icon';
+      iconWrap.appendChild(iconCanvas);
+
+      row.appendChild(iconWrap);
+      row.appendChild(info);
+      row.appendChild(badge);
       list.appendChild(row);
     });
   }
@@ -552,28 +557,66 @@ class Game {
     const timerEl = document.getElementById('daily-timer');
     if (timerEl) timerEl.textContent = `Resets in ${h}h ${m}m`;
 
-    const chestGrid = document.getElementById('chest-grid');
-    if (chestGrid) {
-      chestGrid.innerHTML = '';
+    const track = document.getElementById('chest-swipe-track');
+    const dotsEl = document.getElementById('chest-swipe-dots');
+    if (track) {
+      track.innerHTML = '';
+      if (dotsEl) dotsEl.innerHTML = '';
       const trophies = u.trophies ?? 0;
-      for (const chest of CHEST_DEFS) {
+      CHEST_DEFS.forEach((chest, idx) => {
         const arenaLocked = trophies < (chest.arenaMin ?? 0);
         const canAfford   = !arenaLocked && (u.coins ?? 0) >= chest.cost;
-        // Show which cards can be obtained (by rarity)
-        const rarities  = [...new Set(chest.slots.flat())];
-        const cardNames = Object.values(CARD_DEFS)
-          .filter(d => rarities.includes(d.rarity))
-          .map(d => d.name).join(', ');
-        const el = document.createElement('div');
-        el.className = 'chest-card';
-        el.innerHTML = `
-          <div class="chest-icon">&#127873;</div>
-          <div class="chest-name">${chest.name}</div>
+        const aLevel      = chest.arenaLevel ?? 0;
+
+        // Cards available in this chest
+        const possibleCards = Object.values(CARD_DEFS).filter(d =>
+          (d.arenaUnlock ?? 0) === aLevel || ((d.arenaUnlock ?? 0) < aLevel && !Object.values(CARD_DEFS).some(d2 => (d2.arenaUnlock ?? 0) === aLevel))
+        );
+        const arenaCards = Object.values(CARD_DEFS).filter(d => (d.arenaUnlock ?? 0) === aLevel);
+        const showCards  = arenaCards.length > 0 ? arenaCards : possibleCards;
+
+        const item = document.createElement('div');
+        item.className = 'chest-swipe-item';
+
+        const card = document.createElement('div');
+        card.className = 'chest-card';
+        card.style.setProperty('border-color', arenaLocked ? 'rgba(255,255,255,0.08)' : `${chest.glow}55`);
+
+        // Chest icon canvas
+        const iconCanvas = _drawChestIcon(chest, 64);
+
+        // Possible cards grid
+        const possibleHtml = showCards.map(d => `
+          <div class="chest-possible-card">
+            <div class="chest-possible-card-thumb" data-cardid="${d.id}"></div>
+            <div class="chest-possible-card-name">${d.name}</div>
+          </div>
+        `).join('');
+
+        card.innerHTML = `
+          <div class="chest-name" style="color:${chest.glow}">${chest.name} Chest</div>
+          <div class="chest-arena-badge">${arenaLocked ? '🔒 ' + chest.arenaMin + ' trophies req.' : 'Arena unlocked'}</div>
           <div class="chest-desc">${chest.desc ?? ''}</div>
           <div class="chest-slots">${chest.slots.map(r => `<span class="rarity-dot rarity-${r[0]}">${r[0][0].toUpperCase()}</span>`).join('')}</div>
-          <button class="chest-buy-btn ${canAfford ? '' : 'disabled'}">${arenaLocked ? '🔒 ' + chest.arenaMin + ' trophies' : 'C ' + chest.cost}</button>
+          ${showCards.length ? `
+            <div class="chest-possible-cards">
+              <div class="chest-possible-label">Possible cards</div>
+              <div class="chest-possible-grid">${possibleHtml}</div>
+            </div>` : ''}
+          <button class="chest-buy-btn ${canAfford ? '' : 'disabled'}">
+            ${arenaLocked ? 'Locked' : `Buy · ${chest.cost} coins`}
+          </button>
         `;
-        el.querySelector('.chest-buy-btn')?.addEventListener('click', () => {
+
+        card.prepend(iconCanvas);
+
+        // Attach card thumbnails
+        card.querySelectorAll('.chest-possible-card-thumb').forEach(el => {
+          const cid = el.dataset.cardid;
+          if (cid) el.appendChild(cardThumbCanvas(cid, 36));
+        });
+
+        card.querySelector('.chest-buy-btn')?.addEventListener('click', () => {
           if (!canAfford || arenaLocked) return;
           const result = this.account.openChest(chest.id);
           if (result.ok) {
@@ -581,8 +624,24 @@ class Game {
             this._renderShopTab();
           }
         });
-        chestGrid.appendChild(el);
-      }
+
+        item.appendChild(card);
+        track.appendChild(item);
+
+        // Dot indicator
+        if (dotsEl) {
+          const dot = document.createElement('div');
+          dot.className = 'chest-swipe-dot' + (idx === 0 ? ' active' : '');
+          dotsEl.appendChild(dot);
+        }
+      });
+
+      // Update active dot on scroll
+      track.addEventListener('scroll', () => {
+        const idx = Math.round(track.scrollLeft / track.clientWidth);
+        dotsEl?.querySelectorAll('.chest-swipe-dot').forEach((d, i) =>
+          d.classList.toggle('active', i === idx));
+      }, { passive: true });
     }
 
     const dailyGrid = document.getElementById('daily-shop-grid');
@@ -638,6 +697,7 @@ class Game {
       return;
     }
 
+    this._stopLobbyParticles();
     this.ui.show('matchmaking');
     this.ui.startMatchmakingTimer();
 
@@ -1183,6 +1243,68 @@ class Game {
     if (badge) badge.classList.toggle('hidden', !hasPending);
   }
 
+  // ── Lobby particles ────────────────────────────────────────
+  _startLobbyParticles() {
+    if (this._lobbyParticlesId) return;
+    const canvas = document.getElementById('lobby-particles-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const resize = () => {
+      canvas.width  = canvas.offsetWidth  || window.innerWidth;
+      canvas.height = canvas.offsetHeight || window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const COLORS = ['#7bc8f0', '#f5c518', '#a78bfa', '#34d399', '#60a5fa'];
+    const count  = 32;
+    const pts    = Array.from({ length: count }, () => ({
+      x:     Math.random() * canvas.width,
+      y:     Math.random() * canvas.height,
+      r:     1.5 + Math.random() * 3,
+      vx:    (Math.random() - 0.5) * 18,
+      vy:    -(6 + Math.random() * 14),
+      alpha: 0.2 + Math.random() * 0.5,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      wobble: Math.random() * Math.PI * 2,
+    }));
+
+    const tick = () => {
+      if (!this._lobbyParticlesId) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const dt = 0.016;
+      for (const p of pts) {
+        p.wobble += dt * 1.2;
+        p.x      += p.vx * dt + Math.sin(p.wobble) * 0.5;
+        p.y      += p.vy * dt;
+        if (p.y < -10) {
+          p.y     = canvas.height + 5;
+          p.x     = Math.random() * canvas.width;
+          p.alpha = 0.2 + Math.random() * 0.5;
+        }
+        ctx.save();
+        ctx.globalAlpha = p.alpha * Math.max(0, Math.min(1, (canvas.height - p.y) / 80));
+        ctx.shadowBlur  = 8;
+        ctx.shadowColor = p.color;
+        ctx.fillStyle   = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      this._lobbyParticlesId = requestAnimationFrame(tick);
+    };
+    this._lobbyParticlesId = requestAnimationFrame(tick);
+  }
+
+  _stopLobbyParticles() {
+    if (this._lobbyParticlesId) {
+      cancelAnimationFrame(this._lobbyParticlesId);
+      this._lobbyParticlesId = null;
+    }
+  }
+
   // ── Input: canvas deploy ───────────────────────────────────
   _wireCanvasDeploy() {
     this.canvas.addEventListener('click', e => {
@@ -1247,3 +1369,129 @@ class Game {
 
 // ── Boot ───────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => { window._game = new Game(); });
+
+// ── Arena icon canvas helper ────────────────────────────────
+function _drawArenaIconCanvas(arenaType, color, size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.strokeStyle = color;
+  ctx.fillStyle   = color;
+  ctx.lineWidth   = size * 0.1;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+  const cx = size / 2, cy = size / 2, r = size * 0.38;
+  switch (arenaType) {
+    case 'iron': { // crossed swords
+      ctx.beginPath(); ctx.moveTo(cx-r,cy+r); ctx.lineTo(cx+r,cy-r); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx+r,cy+r); ctx.lineTo(cx-r,cy-r); ctx.stroke();
+      break; }
+    case 'stone': { // mountain peaks
+      ctx.beginPath();
+      ctx.moveTo(cx-r,cy+r*0.7); ctx.lineTo(cx-r*0.2,cy-r*0.7); ctx.lineTo(cx+r*0.4,cy+r*0.7);
+      ctx.moveTo(cx+r*0.1,cy+r*0.7); ctx.lineTo(cx+r,cy-r*0.4); ctx.lineTo(cx+r*1.1,cy+r*0.7);
+      ctx.stroke(); break; }
+    case 'ash': { // flame
+      ctx.beginPath();
+      ctx.moveTo(cx,cy+r); ctx.bezierCurveTo(cx-r,cy,cx-r,cy-r*0.5,cx,cy-r);
+      ctx.bezierCurveTo(cx+r*0.3,cy-r*0.5,cx+r*0.6,cy-r*0.8,cx+r*0.3,cy-r*1.1);
+      ctx.bezierCurveTo(cx+r*0.8,cy-r*0.5,cx+r,cy,cx,cy+r);
+      ctx.fill(); break; }
+    case 'void': { // gem/diamond
+      ctx.beginPath();
+      ctx.moveTo(cx,cy-r); ctx.lineTo(cx+r,cy-r*0.2);
+      ctx.lineTo(cx+r*0.6,cy+r); ctx.lineTo(cx-r*0.6,cy+r);
+      ctx.lineTo(cx-r,cy-r*0.2); ctx.closePath(); ctx.stroke(); break; }
+    case 'arcane': { // star
+      for (let i = 0; i < 5; i++) {
+        const a1 = (i/5)*Math.PI*2 - Math.PI/2;
+        const a2 = a1 + Math.PI/5;
+        ctx.beginPath();
+        ctx.moveTo(cx,cy);
+        ctx.lineTo(cx+Math.cos(a1)*r, cy+Math.sin(a1)*r);
+        ctx.lineTo(cx+Math.cos(a2)*r*0.4, cy+Math.sin(a2)*r*0.4);
+        ctx.fill();
+      } break; }
+    case 'sky': { // cloud with lightning
+      ctx.beginPath(); ctx.arc(cx-r*0.3,cy-r*0.1,r*0.45,Math.PI,0,false);
+      ctx.arc(cx+r*0.3,cy-r*0.2,r*0.32,Math.PI,0,false);
+      ctx.arc(cx+r*0.6,cy+r*0.05,r*0.28,0,Math.PI,false);
+      ctx.arc(cx-r*0.6,cy+r*0.05,r*0.28,0,Math.PI,false);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.moveTo(cx+r*0.1,cy+r*0.15); ctx.lineTo(cx-r*0.15,cy+r*0.65);
+      ctx.lineTo(cx+r*0.08,cy+r*0.55); ctx.lineTo(cx-r*0.12,cy+r);
+      ctx.lineTo(cx+r*0.25,cy+r*0.5); ctx.lineTo(cx+r*0.05,cy+r*0.62);
+      ctx.closePath(); ctx.fill();
+      break; }
+    default:
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+  }
+  return c;
+}
+
+// ── Chest icon canvas helper ────────────────────────────────
+function _drawChestIcon(chest, size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const cx = size/2, cy = size/2;
+  const w = size*0.72, h = size*0.52, x = cx-w/2, y = cy-h/2+size*0.06;
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath(); ctx.ellipse(cx,cy+h*0.62,w*0.42,h*0.15,0,0,Math.PI*2); ctx.fill();
+
+  // Body
+  ctx.fillStyle = chest.color;
+  _rrectCtx(ctx, x, y+h*0.42, w, h*0.58, size*0.06); ctx.fill();
+
+  // Lid
+  ctx.fillStyle = _lightenHex(chest.color, 25);
+  _rrectCtx(ctx, x, y, w, h*0.46, size*0.06); ctx.fill();
+
+  // Lid detail line
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+  ctx.lineWidth = size*0.03;
+  ctx.beginPath(); ctx.moveTo(x+size*0.04, y+h*0.42); ctx.lineTo(x+w-size*0.04, y+h*0.42); ctx.stroke();
+
+  // Lock
+  ctx.fillStyle = chest.glow;
+  ctx.beginPath(); ctx.arc(cx, y+h*0.52, size*0.1, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = chest.glow;
+  ctx.lineWidth = size*0.055;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(cx, y+h*0.38, size*0.09, Math.PI, 0); ctx.stroke();
+
+  // Glow
+  ctx.save();
+  ctx.shadowBlur = size*0.3; ctx.shadowColor = chest.glow;
+  ctx.globalAlpha = 0.4;
+  ctx.fillStyle = chest.glow;
+  ctx.beginPath(); ctx.arc(cx,cy,size*0.15,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  return c;
+}
+
+function _rrectCtx(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y);
+  ctx.arcTo(x+w, y, x+w, y+r, r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+  ctx.lineTo(x+r, y+h);
+  ctx.arcTo(x, y+h, x, y+h-r, r);
+  ctx.lineTo(x, y+r);
+  ctx.arcTo(x, y, x+r, y, r);
+  ctx.closePath();
+}
+
+function _lightenHex(hex, amt) {
+  const num = parseInt(hex.replace('#',''), 16);
+  const r = Math.min(255, (num>>16)+amt);
+  const g = Math.min(255, ((num>>8)&0xff)+amt);
+  const b = Math.min(255, (num&0xff)+amt);
+  return `rgb(${r},${g},${b})`;
+}

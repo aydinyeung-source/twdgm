@@ -137,7 +137,10 @@ export class Account {
     if (!this.user) return;
     if (won) this.user.wins   = (this.user.wins   ?? 0) + 1;
     else     this.user.losses = (this.user.losses ?? 0) + 1;
-    this.user.trophies = Math.max(0, (this.user.trophies ?? 0) + (won ? 15 : -8));
+    // Only award/deduct trophies in normal (1×) mode
+    if (coinMult === 1) {
+      this.user.trophies = Math.max(0, (this.user.trophies ?? 0) + (won ? 15 : -8));
+    }
 
     const today = new Date().toDateString();
     let earn = won ? COINS.WIN : COINS.LOSS;
@@ -252,10 +255,18 @@ export class Account {
     if ((this.user.trophies ?? 0) < (chest.arenaMin ?? 0)) return { err: 'Arena not unlocked yet' };
     if ((this.user.coins ?? 0) < chest.cost) return { err: 'Not enough coins' };
     this.user.coins -= chest.cost;
+    const aLevel = chest.arenaLevel ?? 0;
     const results = []; let coinRefund = 0;
     for (const rarityPool of chest.slots) {
       const rarity = rarityPool[Math.floor(Math.random() * rarityPool.length)];
-      const allOfRarity = ALL_CARD_IDS.filter(id => CARD_DEFS[id].rarity === rarity);
+      // First try exact arena level, fall back to any lower arena, then any card
+      let allOfRarity = ALL_CARD_IDS.filter(id =>
+        CARD_DEFS[id].rarity === rarity && (CARD_DEFS[id].arenaUnlock ?? 0) === aLevel);
+      if (!allOfRarity.length)
+        allOfRarity = ALL_CARD_IDS.filter(id =>
+          CARD_DEFS[id].rarity === rarity && (CARD_DEFS[id].arenaUnlock ?? 0) < aLevel);
+      if (!allOfRarity.length)
+        allOfRarity = ALL_CARD_IDS.filter(id => CARD_DEFS[id].rarity === rarity);
       if (!allOfRarity.length) {
         const refund = Math.round(RARITY_SHOP_PRICE[rarity] * 0.4);
         coinRefund += refund; results.push({ type: 'coins', amount: refund });

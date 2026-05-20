@@ -1,38 +1,50 @@
 import { uid, dist } from './engine.js';
-import { CARD_DEFS, TOWER_DEFS, LANE_LEFT, LANE_RIGHT } from './data.js';
+import { CARD_DEFS, TOWER_DEFS, LANE_LEFT, LANE_RIGHT, TOWER_REGEN_RATE, TOWER_REGEN_DELAY } from './data.js';
 
 // ── Tower ──────────────────────────────────────────────────
 export class Tower {
   constructor(def) {
-    this.id       = def.id;
-    this.owner    = def.owner;   // 'ply' | 'opp'
-    this.kind     = def.kind;    // 'king' | 'princess'
-    this.x        = def.x;
-    this.y        = def.y;
-    this.r        = def.r;
-    this.hp       = def.hp;
-    this.maxHp    = def.hp;
-    this.dmg      = def.dmg;
-    this.range    = def.range;
-    this.rate     = def.rate;    // ms per shot
-    this.cooldown = 0;
-    this.dead     = false;
+    this.id         = def.id;
+    this.owner      = def.owner;
+    this.kind       = def.kind;
+    this.x          = def.x;
+    this.y          = def.y;
+    this.r          = def.r;
+    this.hp         = def.hp;
+    this.maxHp      = def.hp;
+    this.dmg        = def.dmg;
+    this.range      = def.range;
+    this.rate       = def.rate;
+    this.cooldown   = 0;
+    this.dead       = false;
     this.flashTimer = 0;
-    this.target   = null;
+    this.target     = null;
+    // Regen
+    this._idleTimer = 0;  // ms since last damage taken
   }
 
   takeDamage(amount) {
     this.hp = Math.max(0, this.hp - amount);
+    this._idleTimer = 0;  // reset regen countdown
     if (this.hp === 0) { this.dead = true; }
     return this.dead;
   }
 
   update(dt, units) {
     if (this.dead) return null;
-    if (this.cooldown > 0) this.cooldown -= dt * 1000;
-    if (this.flashTimer > 0) this.flashTimer -= dt * 1000;
 
-    // Re-acquire target if current is dead/gone
+    const dtms = dt * 1000;
+    if (this.cooldown   > 0) this.cooldown   -= dtms;
+    if (this.flashTimer > 0) this.flashTimer -= dtms;
+
+    // Regeneration: only when idle and not at full health
+    if (this.hp < this.maxHp) {
+      this._idleTimer += dtms;
+      if (this._idleTimer >= TOWER_REGEN_DELAY) {
+        this.hp = Math.min(this.maxHp, this.hp + TOWER_REGEN_RATE * dt);
+      }
+    }
+
     if (!this.target || this.target.dead ||
         dist(this.x, this.y, this.target.x, this.target.y) > this.range + this.target.r) {
       this.target = this._findTarget(units);
@@ -50,6 +62,7 @@ export class Tower {
     for (const u of units) {
       if (u.dead || u.owner !== hostile) continue;
       if (u.cloakTimer > 0) continue;
+      // Towers can hit both ground and air
       const d = dist(this.x, this.y, u.x, u.y);
       if (d <= this.range + u.r && d < bestDist) { bestDist = d; best = u; }
     }
@@ -59,29 +72,30 @@ export class Tower {
 
 // ── Unit ───────────────────────────────────────────────────
 export class Unit {
-  constructor(defId, owner, lane) {
+  constructor(defId, owner, lane, levelMult = 1) {
     const def      = CARD_DEFS[defId];
     this.id        = uid();
     this.defId     = defId;
-    this.owner     = owner;       // 'ply' | 'opp'
-    this.lane      = lane;        // 0 = left, 1 = right
+    this.owner     = owner;
+    this.lane      = lane;
     this.laneX     = lane === 0 ? LANE_LEFT : LANE_RIGHT;
     this.x         = this.laneX + (Math.random() - 0.5) * 18;
     this.y         = _spawnY(def, owner);
 
-    this.hp        = def.hp;
-    this.maxHp     = def.hp;
+    // Apply level multiplier to base stats
+    this.hp        = def.hp   * levelMult;
+    this.maxHp     = def.hp   * levelMult;
     this.baseSpeed = def.speed;
-    this.baseDmg   = def.dmg;
+    this.baseDmg   = def.dmg  * levelMult;
     this.rate      = def.rate;
     this.r         = def.r;
     this.color     = def.color;
     this.glow      = def.glow;
     this.special   = def.special ? { ...def.special } : null;
-    this.icon      = def.icon;
+    this.flying    = def.flying  ?? false;
+    this.antiAir   = def.antiAir ?? false;
     this.name      = def.name;
 
-    // Direction: 'ply' units march upward (y decreases), 'opp' units march down
     this.dir       = owner === 'ply' ? -1 : 1;
 
     this.dead      = false;
@@ -92,14 +106,13 @@ export class Unit {
     this.incomeTimer  = 0;
     this.flashTimer   = 0;
 
-    // Aura buffs (recalculated every frame)
     this.shielded  = false;
     this.healRate  = 0;
     this.dmgMult   = 1;
     this.spdMult   = 1;
 
-    this.target    = null;   // current Unit target (towers handled separately)
-    this.state     = 'march'; // 'march' | 'fight'
+    this.target    = null;
+    this.state     = 'march';
   }
 
   get speed() { return this.baseSpeed * this.spdMult; }
@@ -130,20 +143,16 @@ export class Unit {
     if (this.cooldown    > 0) this.cooldown    -= dtms;
     if (this.stunTimer   > 0) { this.stunTimer -= dtms; return null; }
 
-    // Farm: stationary income generator
     if (this.special?.type === 'income') return null;
 
-    // Spawner: emit minion periodically
     if (this.special?.type === 'spawner') {
       this.spawnerTimer += dtms;
       if (this.spawnerTimer >= this.special.intervalMs) {
         this.spawnerTimer -= this.special.intervalMs;
-        // signals caller to spawn a minion
         return { action: 'spawn_minion', defId: this.special.spawnId, unit: this };
       }
     }
 
-    // Find nearest hostile unit in aggro range
     const hostile    = this.owner === 'ply' ? 'opp' : 'ply';
     const aggroRange = this.r + 90;
     let unitTarget   = null;
@@ -151,14 +160,18 @@ export class Unit {
     for (const u of units) {
       if (u.dead || u.owner !== hostile) continue;
       if (u.cloakTimer > 0) continue;
+      // Air units can only be targeted by antiAir troops
+      if (u.flying && !this.antiAir) continue;
       const d = dist(this.x, this.y, u.x, u.y);
-      // Only engage units moving TOWARD us OR in our attack range
       if (d < aggroRange && d < unitTargetD) { unitTargetD = d; unitTarget = u; }
     }
 
-    // Choose target: enemy unit first, then tower
     let chosenTarget = unitTarget;
+    // Flying units skip ground towers... actually towers hit everything, so flying
+    // units still target towers. Ground-only units can't TARGET towers if they're
+    // a flying unit targeting a tower (towers always shoot back).
     if (!chosenTarget) {
+      // Flying units still target towers (they fly over the arena to towers)
       chosenTarget = this._bestTowerTarget(towers);
     }
 
@@ -176,14 +189,12 @@ export class Unit {
       }
     } else {
       this.state = 'march';
-      // Move toward target, staying on lane x axis if not engaged
       const targetX = chosenTarget instanceof Tower ? this.laneX : chosenTarget.x;
       const dx = targetX - this.x;
       const dy = chosenTarget.y - this.y;
       const mag = Math.hypot(dx, dy);
       if (mag > 1) {
         const nx = dx / mag, ny = dy / mag;
-        // Blend toward lane x to avoid drifting
         const laneBlend = unitTarget ? 0.3 : 0.7;
         const moveX = nx * (1 - laneBlend) + ((this.laneX - this.x) / (Math.abs(this.laneX - this.x) + 1)) * laneBlend;
         this.x += moveX  * this.speed * dt;
@@ -196,12 +207,8 @@ export class Unit {
   _bestTowerTarget(towers) {
     const hostile = this.owner === 'ply' ? 'opp' : 'ply';
     const side = this.lane === 0 ? 'Left' : 'Right';
-
-    // First try the princess tower in same lane
-    const princess = towers[hostile + side[0].toUpperCase() + side.slice(1)];
-    // king
+    const princess = towers[hostile + side];
     const king = towers[hostile + 'King'];
-
     if (princess && !princess.dead) return princess;
     if (king && !king.dead) return king;
     return null;
@@ -229,7 +236,6 @@ export class Projectile {
     this.dead      = false;
   }
 
-  // Returns true when it hits
   update(dt, target) {
     if (!target || target.dead) { this.dead = true; return false; }
     const dx = target.x - this.x, dy = target.y - this.y;

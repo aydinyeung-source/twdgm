@@ -34,8 +34,8 @@ const PAL = {
 
 // Unit visual styles (no emojis — pure canvas shapes)
 const UNIT_STYLE = {
-  speeder:      { body: '#f97316', rim: '#fed7aa', shape: 'diamond' },
-  swarmer:      { body: '#eab308', rim: '#fef08a', shape: 'triangle' },
+  speeder:      { body: '#f97316', rim: '#fed7aa', shape: 'arrow' },
+  swarmer:      { body: '#eab308', rim: '#fef08a', shape: 'circle' },
   brute:        { body: '#7c3aed', rim: '#c4b5fd', shape: 'hexagon' },
   berserker:    { body: '#dc2626', rim: '#fca5a5', shape: 'star' },
   kamikaze:     { body: '#f59e0b', rim: '#fde68a', shape: 'cross' },
@@ -492,6 +492,7 @@ function _drawShape(ctx, x, y, r, shape, fill) {
     case 'cross':   _crossPath(ctx, x, y, r); break;
     case 'shield':  _shieldPath(ctx, x, y, r); break;
     case 'square':  ctx.rect(x-r, y-r, r*2, r*2); break;
+    case 'arrow':   _arrowPath(ctx, x, y, r); break;
     default:        ctx.arc(x, y, r, 0, Math.PI*2);
   }
   ctx.fillStyle = fill;
@@ -509,9 +510,22 @@ function _strokeShape(ctx, x, y, r, shape) {
     case 'cross':   _crossPath(ctx, x, y, r); break;
     case 'shield':  _shieldPath(ctx, x, y, r); break;
     case 'square':  ctx.rect(x-r, y-r, r*2, r*2); break;
+    case 'arrow':   _arrowPath(ctx, x, y, r); break;
     default:        ctx.arc(x, y, r, 0, Math.PI*2);
   }
   ctx.stroke();
+}
+
+function _arrowPath(ctx, x, y, r) {
+  // Dart/arrow pointing right
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x - r * 0.3, y - r * 0.55);
+  ctx.lineTo(x - r * 0.3, y - r * 0.2);
+  ctx.lineTo(x - r, y - r * 0.2);
+  ctx.lineTo(x - r, y + r * 0.2);
+  ctx.lineTo(x - r * 0.3, y + r * 0.2);
+  ctx.lineTo(x - r * 0.3, y + r * 0.55);
+  ctx.closePath();
 }
 
 function _hexPath(ctx, x, y, r) {

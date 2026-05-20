@@ -68,6 +68,7 @@
   <!-- MAIN MENU -->
   <div id="screen-menu" class="screen">
     <div class="menu-bg"></div>
+    <canvas id="lobby-particles-canvas" class="lobby-particles-canvas"></canvas>
     <div class="menu-layout">
 
       <!-- Always-visible topbar -->
@@ -145,7 +146,7 @@
             <button id="btn-modes" class="btn-modes">⚡ Mode: <span id="modes-current">Normal</span></button>
 
             <div id="battle-deck-warning" class="battle-deck-warning hidden">
-              ⚠ Build a 12-card deck first (6 enemies + 6 troops)
+              ⚠ Build a 12-card deck first (min 2 enemies + 2 troops)
             </div>
           </div>
         </div>
@@ -201,14 +202,17 @@
           <div class="deck-panel">
             <div class="panel-header">
               <h3>Your Deck</h3>
-              <span id="deck-count" class="deck-count-badge">0/6 enemies · 0/6 troops</span>
+              <span id="deck-count" class="deck-count-badge">0/12</span>
             </div>
             <div id="deck-slots" class="deck-slots-grid"></div>
             <div class="panel-header" style="margin-top:6px">
-              <h3>All Cards</h3>
+              <h3>Enemies</h3>
             </div>
-            <div id="card-collection" class="card-collection-grid"></div>
-            <button id="btn-save-deck" class="btn-action" disabled>Save Deck</button>
+            <div id="card-collection-enemies" class="card-collection-grid"></div>
+            <div class="panel-header" style="margin-top:6px">
+              <h3>Troops &amp; Defense</h3>
+            </div>
+            <div id="card-collection-defense" class="card-collection-grid"></div>
           </div>
         </div>
 
@@ -218,7 +222,11 @@
             <div class="panel-header">
               <h3>Arena Chests</h3>
             </div>
-            <div id="chest-grid" class="chest-grid"></div>
+            <!-- Horizontal swipe chest selector -->
+            <div class="chest-swipe-outer">
+              <div class="chest-swipe-track" id="chest-swipe-track"></div>
+              <div class="chest-swipe-dots" id="chest-swipe-dots"></div>
+            </div>
             <div class="panel-header">
               <h3>Daily Shop</h3>
               <span id="daily-timer" class="daily-timer"></span>
@@ -233,6 +241,7 @@
             <div class="settings-section">
               <button id="btn-logout" class="btn-ghost danger-btn">Log Out</button>
             </div>
+            <p class="version-label">v1.1.0</p>
           </div>
         </div>
 
@@ -410,7 +419,7 @@
     <div class="modal-backdrop" id="arena-modal-backdrop"></div>
     <div class="arena-modal-inner">
       <button id="arena-modal-close" class="modal-close-btn">&times;</button>
-      <h3 class="modal-title">Arena Tiers</h3>
+      <h3 class="modal-title">Arenas</h3>
       <div id="arena-tiers-list" class="arena-tiers-list"></div>
     </div>
   </div>

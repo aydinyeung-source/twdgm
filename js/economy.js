@@ -1,15 +1,15 @@
-import { ELIXIR_MAX, ELIXIR_RATE, ELIXIR_RATE_OT } from './data.js';
+import { ELIXIR_MAX, ELIXIR_START, ELIXIR_RATE, ELIXIR_RATE_OT } from './data.js';
 import { clamp } from './engine.js';
 
 export class Economy {
   constructor() {
-    this.elixir     = 5;
-    this._overflow  = 0;
-    this.onChange   = null;
+    this.elixir    = ELIXIR_START;
+    this._overflow = 0;
+    this.onChange  = null;
   }
 
   reset() {
-    this.elixir    = 5;
+    this.elixir    = ELIXIR_START;
     this._overflow = 0;
     this._notify();
   }
@@ -23,7 +23,6 @@ export class Economy {
       this._overflow -= whole;
       this.add(whole);
     }
-    // smooth fractional fill for bar animation
     this._notify();
   }
 
@@ -41,18 +40,15 @@ export class Economy {
 
   canAfford(cost) { return this.elixir >= cost; }
 
-  // fractional elixir (0–10) for smooth bar
   get visual() { return clamp(this.elixir + this._overflow, 0, ELIXIR_MAX); }
 
   _notify() {
     if (this.onChange) this.onChange(this);
-    // Update DOM directly for performance
     const fill = document.getElementById('elixir-bar-fill');
     const num  = document.getElementById('elixir-num');
     if (fill) fill.style.width = `${(this.visual / ELIXIR_MAX) * 100}%`;
     if (num)  num.textContent  = Math.floor(this.elixir);
 
-    // Light up pip segments
     document.querySelectorAll('.epip').forEach(pip => {
       const n = parseInt(pip.dataset.n, 10);
       pip.classList.toggle('active', n <= this.elixir);
