@@ -319,6 +319,10 @@ class Game {
         el.className = ['coll-card', isInDeck ? 'in-deck' : '', !isUnlocked ? 'locked' : ''].filter(Boolean).join(' ');
         const raceCol = RACE_DEFS[def.race]?.color ?? '#888';
         el.style.setProperty('--race-color', raceCol);
+        const info        = isUnlocked ? this.account.getLevelInfo(id) : null;
+        const copiesText  = !info ? '' : info.maxed ? 'MAX' : `${info.copies}/${info.req.copies}`;
+        const copyPct     = !info ? 0  : info.maxed ? 100  : Math.min(100, (info.copies / info.req.copies) * 100);
+        const copyClass   = !info ? '' : info.maxed ? 'maxed' : info.canLevel ? 'can-upgrade' : '';
         el.innerHTML = `
           <div class="cc-cost">${def.cost}</div>
           ${lvl > 1 ? `<div class="cc-level-badge">Lv${lvl}</div>` : ''}
@@ -326,6 +330,7 @@ class Game {
           <div class="cc-info">
             <div class="cc-name">${def.name}</div>
             <div class="cc-race">${RACE_DEFS[def.race]?.name ?? (def.type === 'spell' ? 'SPELL' : def.type === 'building' ? 'STRUCTURE' : '')}</div>
+            ${isUnlocked ? `<div class="cc-copies ${copyClass}">${copiesText}</div><div class="cc-bar-wrap"><div class="cc-bar-fill ${copyClass}" style="width:${copyPct}%"></div></div>` : ''}
           </div>
           ${!isUnlocked ? '<div class="cc-lock">&#128274;</div>' : ''}
           ${isInDeck    ? '<div class="cc-check">&#10003;</div>' : ''}
@@ -1401,9 +1406,10 @@ class Game {
 
   // ── Coin Modes ─────────────────────────────────────────────
   _wireModes() {
-    document.getElementById('btn-modes')?.addEventListener('click', () => {
-      document.getElementById('modes-modal')?.classList.remove('hidden');
-    });
+    const openModes = () => document.getElementById('modes-modal')?.classList.remove('hidden');
+    document.getElementById('btn-modes')?.addEventListener('click', openModes);
+    document.getElementById('mode-display')?.addEventListener('click', openModes);
+    document.getElementById('mode-display-btn')?.addEventListener('click', e => { e.stopPropagation(); openModes(); });
     document.getElementById('modes-modal-backdrop')?.addEventListener('click', () => {
       document.getElementById('modes-modal')?.classList.add('hidden');
     });
@@ -1422,12 +1428,24 @@ class Game {
   }
 
   _updateModeDisplay() {
-    const el = document.getElementById('modes-current');
-    if (!el) return;
-    if (this._coinMode === 'practice') el.textContent = 'Practice';
-    else if (this._coinMode === Infinity) el.textContent = '∞ Coins';
-    else if (this._coinMode === 1)        el.textContent = 'Normal';
-    else                                  el.textContent = `${this._coinMode}× Coins`;
+    const el          = document.getElementById('modes-current');
+    const arenaEl     = document.getElementById('arena-display');
+    const modeEl      = document.getElementById('mode-display');
+    const modeNameEl  = document.getElementById('mode-display-name');
+    const modeSubEl   = document.getElementById('mode-display-sub');
+
+    const isNormal = this._coinMode === 1;
+    arenaEl?.classList.toggle('hidden', !isNormal);
+    modeEl?.classList.toggle('hidden',  isNormal);
+
+    let label, sub;
+    if (this._coinMode === 'practice') { label = 'Practice Mode';        sub = 'No stats tracked'; }
+    else if (this._coinMode === Infinity){ label = 'Infinite Coins';     sub = 'Coins not saved to profile'; }
+    else                                 { label = `${this._coinMode}× Coin Boost`; sub = `Earn ${this._coinMode}× coins per match`; }
+
+    if (el)         el.textContent = isNormal ? 'Normal' : label;
+    if (modeNameEl) modeNameEl.textContent = label;
+    if (modeSubEl)  modeSubEl.textContent  = sub;
   }
 
   _updateFriendsBadge() {

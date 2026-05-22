@@ -109,7 +109,7 @@
               </div>
             </div>
 
-            <!-- Arena display -->
+            <!-- Arena display (normal/trophy mode only) -->
             <div id="arena-display" class="arena-display">
               <div class="arena-icon-wrap">
                 <svg viewBox="0 0 80 80" width="56" height="56" fill="none">
@@ -132,6 +132,23 @@
               </button>
             </div>
 
+            <!-- Mode display (all non-trophy modes) — replaces arena display -->
+            <div id="mode-display" class="arena-display hidden" id="mode-display" style="cursor:pointer">
+              <div class="arena-icon-wrap">
+                <svg viewBox="0 0 56 56" width="56" height="56" fill="none">
+                  <circle cx="28" cy="28" r="26" fill="rgba(45,139,204,0.15)" stroke="rgba(45,139,204,0.35)" stroke-width="1.5"/>
+                  <path d="M32 14l-10 16h8l-6 12 14-18h-9z" fill="#f5c518" opacity="0.9"/>
+                </svg>
+              </div>
+              <div class="arena-info">
+                <div id="mode-display-name" class="arena-name">Practice Mode</div>
+                <div id="mode-display-sub" class="arena-range">No stats tracked</div>
+              </div>
+              <button class="arena-tiers-btn" id="mode-display-btn" title="Change mode">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M6 10l4-4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+              </button>
+            </div>
+
             <button id="btn-battle" class="btn-battle">
               <svg viewBox="0 0 40 40" width="42" height="42" fill="none">
                 <line x1="8" y1="32" x2="32" y2="8" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
@@ -140,7 +157,6 @@
                 <line x1="12" y1="20" x2="20" y2="12" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
               </svg>
               <span class="battle-label">BATTLE</span>
-              <span class="battle-sub">1v1 · Online</span>
             </button>
 
             <button id="btn-modes" class="btn-modes">⚡ Mode: <span id="modes-current">Normal</span></button>
