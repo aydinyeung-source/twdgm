@@ -395,7 +395,7 @@ input  { font-family: inherit; outline: none; }
 .coll-card:hover:not(.locked) { transform: scale(1.04); border-color: rgba(125,200,240,0.55); }
 .coll-card.in-deck { border-color: var(--yellow-warm); box-shadow: 0 0 10px rgba(245,197,24,0.25); }
 .coll-card.locked { opacity: 0.4; cursor: not-allowed; }
-.cc-cost { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--purple); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: white; z-index: 2; }
+.cc-cost { position: absolute; top: 4px; left: 4px; width: 28px; height: 28px; border-radius: 50%; background: var(--purple); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: white; z-index: 2; box-shadow: 0 2px 6px rgba(124,58,237,0.5); }
 .cc-level-badge { position: absolute; top: 4px; right: 4px; font-size: 7px; font-weight: 800; color: var(--yellow-warm); background: rgba(245,197,24,0.18); border: 1px solid rgba(245,197,24,0.4); border-radius: 4px; padding: 1px 3px; z-index: 2; }
 .cc-icon { position: absolute; inset: 0; }
 .cc-icon canvas { width: 100%; height: 100%; display: block; }
@@ -575,7 +575,7 @@ input  { font-family: inherit; outline: none; }
 
 /* Card hand */
 #hud-hand { display: flex; align-items: flex-end; gap: 7px; }
-.next-card-slot { flex-shrink: 0; width: 56px; height: 76px; background: rgba(255,255,255,0.04); border: 1px dashed rgba(125,200,240,0.2); border-radius: 11px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
+.next-card-slot { flex-shrink: 0; width: 64px; height: 92px; background: rgba(255,255,255,0.04); border: 1px dashed rgba(125,200,240,0.2); border-radius: 11px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
 .nc-cost { width: 22px; height: 22px; border-radius: 50%; background: var(--purple); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: var(--white); box-shadow: 0 2px 6px rgba(124,58,237,0.5); }
 .nc-body { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
 #card-hand { flex: 1; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; align-items: flex-end; }
@@ -585,8 +585,8 @@ input  { font-family: inherit; outline: none; }
 .card {
   flex-shrink: 0;
   width: calc((100% - 18px) / 4);
-  min-width: 76px; max-width: 96px;
-  height: 112px;
+  min-width: 84px; max-width: 110px;
+  height: 140px;
   border-radius: var(--radius-card);
   border: 2px solid transparent;
   background: var(--c-panel);
@@ -604,7 +604,7 @@ input  { font-family: inherit; outline: none; }
 .card:not(.selected):hover { transform: translateY(-4px); box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
 .card.unaffordable { opacity: 0.38; cursor: default; }
 .card.unaffordable:hover { transform: none; }
-.card-cost { position: absolute; top: 6px; left: 6px; width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #6d28d9); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: var(--white); z-index: 2; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+.card-cost { position: absolute; top: 6px; left: 6px; width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #6d28d9); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800; color: var(--white); z-index: 2; box-shadow: 0 2px 10px rgba(124,58,237,0.6); }
 .card-type-badge { position: absolute; top: 6px; right: 5px; font-size: 7px; font-weight: 800; padding: 2px 5px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; z-index: 2; }
 .card.type-troop    .card-type-badge { background: rgba(45,139,204,0.3);  color: var(--blue-light); }
 .card.type-enemy    .card-type-badge { background: rgba(220,38,38,0.3);   color: #fca5a5; }
