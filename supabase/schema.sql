@@ -38,10 +38,10 @@ on conflict do nothing;
 
 -- ── Users ────────────────────────────────────────────────────
 -- username is citext so "Alex" and "alex" are treated as the same username.
+-- Passwords are managed entirely by Supabase Auth (auth.users); no hash stored here.
 create table if not exists users (
   id              uuid        primary key default gen_random_uuid(),
   username        citext      not null unique,   -- case-insensitive unique
-  password_hash   text        not null,
   player_tag      text        not null unique default generate_player_tag(),
   trophies        int         not null default 0,
   peak_trophies   int         not null default 0,
@@ -157,6 +157,9 @@ alter table matches       enable row level security;
 -- Users: anyone can read public profile fields, only owner can see password_hash
 create policy "public profiles" on users
   for select using (true);
+
+create policy "own user insert" on users
+  for insert with check (auth.uid() = id);
 
 create policy "own user write" on users
   for update using (auth.uid() = id);

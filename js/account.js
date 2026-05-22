@@ -109,15 +109,17 @@ export class Account {
 
     const u = { username, wins: 0, losses: 0, trophies: 0 };
     this._migrate(u);
+    // Set user in memory immediately so the session is valid right away
+    this.user = u;
+    localStorage.setItem(USER_KEY, JSON.stringify(u));
 
+    // Persist profile to Supabase — failures are logged but don't block the user
     const { error: insertErr } = await supabase.from('users').insert({
       id: data.user.id,
       ...this._userToProfile(u),
     });
-    if (insertErr) throw new Error('Could not save profile: ' + insertErr.message);
+    if (insertErr) console.warn('Profile sync failed (will retry on next save):', insertErr.message);
 
-    this.user = u;
-    localStorage.setItem(USER_KEY, JSON.stringify(u));
     return u;
   }
 
