@@ -16,8 +16,9 @@ function _genTag() {
 
 export class Account {
   constructor() {
-    this._supaUser  = null;
-    this._syncTimer = null;
+    this._supaUser      = null;
+    this._syncTimer     = null;
+    this._heartbeatTimer = null;
     this.token = localStorage.getItem(TOKEN_KEY);
     this.user  = JSON.parse(localStorage.getItem(USER_KEY) || 'null');
     if (this.user) this._migrate(this.user);
@@ -31,6 +32,7 @@ export class Account {
     this.token = data.session.access_token;
     localStorage.setItem(TOKEN_KEY, this.token);
     await this._fetchProfile(data.session.user.id);
+    this.startHeartbeat();
   }
 
   async _fetchProfile(userId) {
@@ -91,6 +93,7 @@ export class Account {
     localStorage.setItem(TOKEN_KEY, this.token);
     await this._fetchProfile(data.user.id);
     if (!this.user) throw new Error('Profile not found.');
+    this.startHeartbeat();
     return this.user;
   }
 
@@ -120,10 +123,12 @@ export class Account {
     });
     if (insertErr) console.warn('Profile sync failed (will retry on next save):', insertErr.message);
 
+    this.startHeartbeat();
     return u;
   }
 
   logout() {
+    this.stopHeartbeat();
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     this.token = null; this.user = null; this._supaUser = null;
@@ -301,46 +306,109 @@ export class Account {
   }
 
   // ── Friends ─────────────────────────────────────────────────
-  sendFriendRequest(targetTag) {
-    if (!this.user) return { err: 'Not logged in' };
+  async sendFriendRequest(targetTag) {
+    if (!this.user || !this._supaUser) return { err: 'Not logged in' };
     targetTag = targetTag.toUpperCase().trim();
     if (!targetTag.startsWith('#')) targetTag = '#' + targetTag;
     if (targetTag === this.user.playerTag) return { err: 'Cannot add yourself' };
-    if ((this.user.friends ?? []).some(f => f.tag === targetTag)) return { err: 'Already friends' };
-    if ((this.user.outgoingRequests ?? []).some(r => r.tag === targetTag)) return { err: 'Request already sent' };
-    if (!this.user.outgoingRequests) this.user.outgoingRequests = [];
-    this.user.outgoingRequests.push({ tag: targetTag, username: '???', sentAt: Date.now() });
-    if (!this.user.pendingRequests) this.user.pendingRequests = [];
-    this.user.pendingRequests.push({ tag: this.user.playerTag, username: this.user.username, sentAt: Date.now(), playTimeSeen: this.user.playtime ?? 0 });
-    this._save_silent(this.user);
+
+    const { data: target, error: lookupErr } = await supabase
+      .from('users').select('id, username, player_tag').eq('player_tag', targetTag).single();
+    if (lookupErr || !target) return { err: 'Player not found' };
+
+    const myId = this._supaUser.id;
+    const { data: existing } = await supabase.from('friendships')
+      .select('id, status')
+      .or(`and(requester.eq.${myId},addressee.eq.${target.id}),and(requester.eq.${target.id},addressee.eq.${myId})`)
+      .maybeSingle();
+    if (existing) return { err: existing.status === 'accepted' ? 'Already friends' : 'Request already sent' };
+
+    const { error } = await supabase.from('friendships').insert({ requester: myId, addressee: target.id });
+    if (error) return { err: error.message };
     return { ok: true };
   }
 
-  acceptFriendRequest(senderTag) {
-    if (!this.user) return { err: 'Not logged in' };
-    const req = (this.user.pendingRequests ?? []).find(r => r.tag === senderTag);
-    if (!req) return { err: 'Request not found' };
-    this.user.pendingRequests = this.user.pendingRequests.filter(r => r.tag !== senderTag);
-    if (!this.user.friends) this.user.friends = [];
-    if (!this.user.friends.some(f => f.tag === senderTag)) this.user.friends.push({ tag: senderTag, username: req.username, addedAt: Date.now() });
-    this._save_silent(this.user);
+  async getFriends() {
+    if (!this._supaUser) return [];
+    const myId = this._supaUser.id;
+    const { data } = await supabase.from('friendships')
+      .select('id, requester, addressee, requester_user:users!requester(id, username, player_tag, trophies, last_seen_at), addressee_user:users!addressee(id, username, player_tag, trophies, last_seen_at)')
+      .eq('status', 'accepted')
+      .or(`requester.eq.${myId},addressee.eq.${myId}`);
+    if (!data) return [];
+    const now = Date.now();
+    return data.map(f => {
+      const friend = f.requester === myId ? f.addressee_user : f.requester_user;
+      const lastSeen = friend?.last_seen_at ? new Date(friend.last_seen_at).getTime() : 0;
+      return {
+        id: friend?.id,
+        username: friend?.username ?? '?',
+        tag: friend?.player_tag ?? '',
+        trophies: friend?.trophies ?? 0,
+        online: now - lastSeen < 120000,
+        friendshipId: f.id,
+      };
+    });
+  }
+
+  async getPendingRequests() {
+    if (!this._supaUser) return [];
+    const { data } = await supabase.from('friendships')
+      .select('id, requester_user:users!requester(username, player_tag, trophies)')
+      .eq('addressee', this._supaUser.id)
+      .eq('status', 'pending');
+    if (!data) return [];
+    return data.map(f => ({
+      friendshipId: f.id,
+      tag: f.requester_user?.player_tag ?? '',
+      username: f.requester_user?.username ?? '?',
+      trophies: f.requester_user?.trophies ?? 0,
+    }));
+  }
+
+  async getPendingRequestCount() {
+    if (!this._supaUser) return 0;
+    const { count } = await supabase.from('friendships')
+      .select('id', { count: 'exact', head: true })
+      .eq('addressee', this._supaUser.id)
+      .eq('status', 'pending');
+    return count ?? 0;
+  }
+
+  async acceptFriendRequest(friendshipId) {
+    if (!this._supaUser) return { err: 'Not logged in' };
+    const { error } = await supabase.from('friendships')
+      .update({ status: 'accepted' })
+      .eq('id', friendshipId)
+      .eq('addressee', this._supaUser.id);
+    if (error) return { err: error.message };
     return { ok: true };
   }
 
-  declineFriendRequest(senderTag) {
-    if (!this.user) return { err: 'Not logged in' };
-    this.user.pendingRequests = (this.user.pendingRequests ?? []).filter(r => r.tag !== senderTag);
-    this._save_silent(this.user);
-    return { ok: true };
+  async declineFriendRequest(friendshipId) {
+    if (!this._supaUser) return;
+    await supabase.from('friendships').delete().eq('id', friendshipId).eq('addressee', this._supaUser.id);
   }
 
-  removeFriend(tag) {
-    if (!this.user) return;
-    this.user.friends = (this.user.friends ?? []).filter(f => f.tag !== tag);
-    this._save_silent(this.user);
+  async removeFriend(friendshipId) {
+    if (!this._supaUser) return;
+    await supabase.from('friendships').delete().eq('id', friendshipId);
   }
 
-  hasPendingRequests() { return (this.user?.pendingRequests?.length ?? 0) > 0; }
+  // ── Presence heartbeat ────────────────────────────────────────
+  startHeartbeat() {
+    if (this._heartbeatTimer) return;
+    const ping = async () => {
+      if (!this._supaUser?.id) return;
+      await supabase.from('users').update({ last_seen_at: new Date().toISOString() }).eq('id', this._supaUser.id).catch(() => {});
+    };
+    ping();
+    this._heartbeatTimer = setInterval(ping, 30000);
+  }
+
+  stopHeartbeat() {
+    if (this._heartbeatTimer) { clearInterval(this._heartbeatTimer); this._heartbeatTimer = null; }
+  }
 
   // ── Persistence ─────────────────────────────────────────────
   _save(token, user) {
@@ -388,9 +456,6 @@ export class Account {
       card_levels:       u.cardLevels       ?? {},
       card_copies:       u.cardCopies       ?? {},
       match_history:     u.matchHistory     ?? [],
-      friends:           u.friends          ?? [],
-      pending_requests:  u.pendingRequests  ?? [],
-      outgoing_requests: u.outgoingRequests ?? [],
       playtime:          u.playtime         ?? 0,
       daily_shop_bought: u.dailyShopBought  ?? {},
     };
@@ -411,9 +476,6 @@ export class Account {
       cardLevels:      p.card_levels       ?? {},
       cardCopies:      p.card_copies       ?? {},
       matchHistory:    p.match_history     ?? [],
-      friends:         p.friends           ?? [],
-      pendingRequests: p.pending_requests  ?? [],
-      outgoingRequests:p.outgoing_requests ?? [],
       playtime:        p.playtime          ?? 0,
       dailyShopBought: p.daily_shop_bought ?? {},
     };

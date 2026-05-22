@@ -1289,11 +1289,11 @@ class Game {
     });
   }
 
-  _openFriendsPanel() {
+  async _openFriendsPanel() {
     const panel = document.getElementById('friends-panel');
     if (!panel) return;
     panel.classList.remove('hidden');
-    this._renderFriendsPanel();
+    await this._renderFriendsPanel();
   }
 
   _closeFriendsPanel() {
@@ -1306,12 +1306,13 @@ class Game {
     document.getElementById('friends-requests-panel')?.classList.toggle('hidden', tab !== 'requests');
   }
 
-  _sendFriendRequest() {
+  async _sendFriendRequest() {
     const input = document.getElementById('friend-tag-input');
     const msgEl = document.getElementById('friend-add-msg');
     const tag   = input?.value.trim().toUpperCase();
     if (!tag) return;
-    const result = this.account.sendFriendRequest(tag);
+    if (msgEl) { msgEl.textContent = 'Sending…'; msgEl.className = 'friend-add-msg'; }
+    const result = await this.account.sendFriendRequest(tag);
     if (msgEl) {
       msgEl.textContent = result.ok ? 'Request sent!' : (result.err ?? 'Error');
       msgEl.className   = 'friend-add-msg ' + (result.ok ? 'success' : 'error');
@@ -1320,20 +1321,17 @@ class Game {
     if (result.ok && input) input.value = '';
   }
 
-  _renderFriendsPanel() {
-    const u = this.account.getUser();
-    if (!u) return;
+  async _renderFriendsPanel() {
+    const [friends, requests] = await Promise.all([
+      this.account.getFriends(),
+      this.account.getPendingRequests(),
+    ]);
 
-    const friends  = u.friends ?? [];
-    const requests = u.pendingRequests ?? [];
-
-    // Count badges
     const fCountEl = document.getElementById('friends-count');
     const rCountEl = document.getElementById('requests-count');
     if (fCountEl) fCountEl.textContent = friends.length;
     if (rCountEl) rCountEl.textContent = requests.length;
 
-    // Pending banner
     const banner = document.getElementById('pending-requests-banner');
     const pCount = document.getElementById('pending-requests-count');
     if (banner) banner.classList.toggle('hidden', requests.length === 0);
@@ -1351,18 +1349,21 @@ class Game {
         const row = document.createElement('div');
         row.className = 'friend-row';
         row.innerHTML = `
-          <div class="friend-avatar">${(f.username?.[0] ?? '?').toUpperCase()}</div>
+          <div class="friend-avatar-wrap">
+            <div class="friend-avatar">${(f.username?.[0] ?? '?').toUpperCase()}</div>
+            <div class="friend-status-dot ${f.online ? 'online' : 'offline'}"></div>
+          </div>
           <div class="friend-info">
             <div class="friend-name">${f.username}</div>
-            <div class="friend-tag">${f.tag ?? ''}</div>
+            <div class="friend-tag">${f.tag}${f.online ? ' · <span class="friend-online-label">Online</span>' : ` · ${f.trophies} 🏆`}</div>
           </div>
           <div class="friend-actions">
             <button class="friend-remove-btn">Remove</button>
           </div>
         `;
-        row.querySelector('.friend-remove-btn')?.addEventListener('click', () => {
-          this.account.removeFriend(f.tag);
-          this._renderFriendsPanel();
+        row.querySelector('.friend-remove-btn')?.addEventListener('click', async () => {
+          await this.account.removeFriend(f.friendshipId);
+          await this._renderFriendsPanel();
           this._updateFriendsBadge();
         });
         listEl.appendChild(row);
@@ -1382,21 +1383,21 @@ class Game {
           <div class="friend-avatar">${(r.username?.[0] ?? '?').toUpperCase()}</div>
           <div class="friend-info">
             <div class="friend-name">${r.username}</div>
-            <div class="friend-tag">${r.tag ?? ''}</div>
+            <div class="friend-tag">${r.tag}</div>
           </div>
           <div class="friend-actions">
             <button class="request-accept-btn">Accept</button>
             <button class="request-decline-btn">Decline</button>
           </div>
         `;
-        row.querySelector('.request-accept-btn')?.addEventListener('click', () => {
-          this.account.acceptFriendRequest(r.tag);
-          this._renderFriendsPanel();
+        row.querySelector('.request-accept-btn')?.addEventListener('click', async () => {
+          await this.account.acceptFriendRequest(r.friendshipId);
+          await this._renderFriendsPanel();
           this._updateFriendsBadge();
         });
-        row.querySelector('.request-decline-btn')?.addEventListener('click', () => {
-          this.account.declineFriendRequest(r.tag);
-          this._renderFriendsPanel();
+        row.querySelector('.request-decline-btn')?.addEventListener('click', async () => {
+          await this.account.declineFriendRequest(r.friendshipId);
+          await this._renderFriendsPanel();
           this._updateFriendsBadge();
         });
         reqListEl.appendChild(row);
@@ -1449,9 +1450,10 @@ class Game {
   }
 
   _updateFriendsBadge() {
-    const badge  = document.getElementById('friends-badge');
-    const hasPending = this.account.hasPendingRequests();
-    if (badge) badge.classList.toggle('hidden', !hasPending);
+    this.account.getPendingRequestCount().then(count => {
+      const badge = document.getElementById('friends-badge');
+      if (badge) badge.classList.toggle('hidden', count === 0);
+    }).catch(() => {});
   }
 
   // ── Lobby particles ────────────────────────────────────────

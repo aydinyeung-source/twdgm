@@ -172,3 +172,31 @@ create policy "matches readable" on matches
 -- Season stats: readable by everyone
 create policy "season stats readable" on season_stats
   for select using (true);
+
+-- ── Friendships ───────────────────────────────────────────────
+create table if not exists friendships (
+  id          bigserial   primary key,
+  requester   uuid        not null references users(id) on delete cascade,
+  addressee   uuid        not null references users(id) on delete cascade,
+  status      text        not null default 'pending',  -- 'pending' | 'accepted'
+  created_at  timestamptz not null default now(),
+  unique (requester, addressee),
+  check (requester <> addressee)
+);
+
+create index if not exists friendships_addressee_idx on friendships(addressee);
+create index if not exists friendships_requester_idx on friendships(requester);
+
+alter table friendships enable row level security;
+
+create policy "friendships select" on friendships
+  for select using (auth.uid() = requester or auth.uid() = addressee);
+
+create policy "friendships insert" on friendships
+  for insert with check (auth.uid() = requester);
+
+create policy "friendships update" on friendships
+  for update using (auth.uid() = addressee);
+
+create policy "friendships delete" on friendships
+  for delete using (auth.uid() = requester or auth.uid() = addressee);
