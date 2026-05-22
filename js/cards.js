@@ -21,14 +21,15 @@ export class Deck {
 // ── Card Hand ──────────────────────────────────────────────
 export class Hand {
   constructor(economy, deckCardIds, onPlay, opts = {}) {
-    this.economy   = economy;
-    this.onPlay    = onPlay;
-    this.cards     = [];
-    this.nextId    = null;
-    this.selected  = -1;
-    this._deck     = new Deck(deckCardIds);
-    this._getLevel = opts.getLevel ?? null;
-    this._onCardInfo = opts.onCardInfo ?? null;
+    this.economy      = economy;
+    this.onPlay       = onPlay;
+    this.cards        = [];
+    this.nextId       = null;
+    this.selected     = -1;
+    this._deck        = new Deck(deckCardIds);
+    this._getLevel    = opts.getLevel    ?? null;
+    this._onCardInfo  = opts.onCardInfo  ?? null;
+    this._onDragStart = opts.onDragStart ?? null;
   }
 
   deal() {
@@ -104,7 +105,14 @@ export class Hand {
         <div class="card-race">${RACE_DEFS[def.race]?.name ?? ''}</div>
       `;
       el.querySelector('.card-icon').appendChild(cardThumbCanvas(id, 44));
-      el.addEventListener('click', () => this.select(i));
+      if (this._onDragStart) {
+        el.addEventListener('pointerdown', e => {
+          e.preventDefault();
+          this._onDragStart(i, e.clientX, e.clientY);
+        });
+      } else {
+        el.addEventListener('click', () => this.select(i));
+      }
       container.appendChild(el);
     });
 

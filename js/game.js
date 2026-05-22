@@ -33,6 +33,7 @@ class State {
     this.activeSpells   = [];
     this.hovCell        = null;   // nearest valid cell under mouse cursor
     this.showValidCells = false;  // true when defender card is selected + mouse on left side
+    this.dragPreview    = null;   // { defId, x, y, valid, r, color, type, spellRadius? }
   }
 }
 
@@ -58,6 +59,8 @@ class Game {
     this._lobbyParticlesId  = null;
     this._occupiedCells     = new Set();  // "cx,cy" keys for placed defenders
     this._pendingCell       = null;       // cell chosen for current deploy
+    this._dragCard          = null;       // { idx, defId } while dragging
+    this._dragGhost         = null;       // ghost DOM element
 
     this._wireAuthUI();
     this._wireMenuUI();
@@ -65,6 +68,7 @@ class Game {
     this._wireGameInput();
     this._wireResultUI();
     this._wireCanvasDeploy();
+    this._wireDrag();
     this._wireCardModal();
     this._wireArenaModal();
     this._wireFriendsPanel();
@@ -888,7 +892,10 @@ class Game {
           this.state.stats.units++;
         }
       },
-      { getLevel: id => this.account.getCardLevel(id) }
+      {
+        getLevel:    id => this.account.getCardLevel(id),
+        onDragStart: (i, cx, cy) => this._startDrag(i, cx, cy),
+      }
     );
     this.hand.deal();
 
@@ -1608,6 +1615,138 @@ class Game {
   }
 
   _wireGameInput() {}
+
+  // ── Drag-and-deploy (Clash Royale style) ───────────────────
+  _wireDrag() {
+    window.addEventListener('pointermove', e => {
+      if (this._dragCard) this._moveDrag(e.clientX, e.clientY);
+    });
+    window.addEventListener('pointerup', e => {
+      if (this._dragCard) this._dropDrag(e.clientX, e.clientY);
+    });
+    window.addEventListener('pointercancel', () => {
+      if (this._dragCard) this._endDrag();
+    });
+  }
+
+  _startDrag(idx, clientX, clientY) {
+    if (!this._active || !this.hand) return;
+    const id = this.hand.cards[idx];
+    if (!id) return;
+    const def = CARD_DEFS[id];
+    if (!def) return;
+
+    this._dragCard = { idx, defId: id };
+
+    // Select card visually (bypass affordability toggle so ghost always appears)
+    this.hand.selected = idx;
+    this.hand._render();
+
+    // Build ghost DOM
+    const ghost = document.createElement('div');
+    ghost.className = 'card-drag-ghost';
+    const cnv = cardThumbCanvas(id, 60);
+    const costEl = document.createElement('div');
+    costEl.className = 'cdg-cost';
+    costEl.textContent = def.cost;
+    const nameEl = document.createElement('div');
+    nameEl.className = 'cdg-name';
+    nameEl.textContent = def.name;
+    ghost.appendChild(cnv);
+    ghost.appendChild(costEl);
+    ghost.appendChild(nameEl);
+    document.body.appendChild(ghost);
+    this._dragGhost = ghost;
+
+    this._moveDrag(clientX, clientY);
+  }
+
+  _moveDrag(clientX, clientY) {
+    if (!this._dragGhost) return;
+    this._dragGhost.style.left = clientX + 'px';
+    this._dragGhost.style.top  = clientY + 'px';
+
+    if (!this._active || !this.state) return;
+
+    const rect  = this.canvas.getBoundingClientRect();
+    const scale = this.renderer.scale;
+    const mx    = (clientX - rect.left) / scale;
+    const my    = (clientY - rect.top)  / scale;
+    const over  = clientX >= rect.left && clientX <= rect.right &&
+                  clientY >= rect.top  && clientY <= rect.bottom;
+
+    if (!over) {
+      this.state.dragPreview    = null;
+      this.state.showValidCells = false;
+      this.state.hovCell        = null;
+      return;
+    }
+
+    const def = CARD_DEFS[this._dragCard.defId];
+    const r   = def.r ?? 18;
+
+    if (def.type === 'enemy') {
+      const valid = mx >= HALF_W;
+      this.state.dragPreview    = { defId: this._dragCard.defId, x: mx, y: my, valid, r, color: def.color, type: 'enemy' };
+      this.state.showValidCells = false;
+      this.state.hovCell        = null;
+    } else if (def.type === 'spell') {
+      this.state.dragPreview    = { defId: this._dragCard.defId, x: mx, y: my, valid: true, r: 20, color: def.color, type: 'spell', spellRadius: def.special?.radius ?? def.special?.splashR ?? 60 };
+      this.state.showValidCells = false;
+      this.state.hovCell        = null;
+    } else {
+      const valid = mx < HALF_W;
+      if (valid) {
+        const cell = _nearestValidCell(mx, my, this._occupiedCells);
+        this.state.hovCell        = cell;
+        this.state.showValidCells = true;
+        this.state.dragPreview    = { defId: this._dragCard.defId, x: cell?.cx ?? mx, y: cell?.cy ?? my, valid: !!cell, r, color: def.color, type: 'troop' };
+      } else {
+        this.state.dragPreview    = { defId: this._dragCard.defId, x: mx, y: my, valid: false, r, color: def.color, type: 'troop' };
+        this.state.showValidCells = false;
+        this.state.hovCell        = null;
+      }
+    }
+  }
+
+  _dropDrag(clientX, clientY) {
+    if (!this._dragCard) return;
+    const rect  = this.canvas.getBoundingClientRect();
+    const scale = this.renderer.scale;
+    const mx    = (clientX - rect.left) / scale;
+    const my    = (clientY - rect.top)  / scale;
+    const over  = clientX >= rect.left && clientX <= rect.right &&
+                  clientY >= rect.top  && clientY <= rect.bottom;
+
+    if (over && this._active) {
+      const def = CARD_DEFS[this._dragCard.defId];
+      if (def.type === 'enemy') {
+        if (mx >= HALF_W) this.hand.tryDeploy(0);
+      } else if (def.type === 'spell') {
+        this.hand.tryDeploy(0, { x: mx, y: my });
+      } else {
+        if (mx < HALF_W) {
+          const cell = _nearestValidCell(mx, my, this._occupiedCells);
+          if (cell) { this._pendingCell = cell; this.hand.tryDeploy(0); this._pendingCell = null; }
+        }
+      }
+    }
+    this._endDrag();
+  }
+
+  _endDrag() {
+    if (this._dragGhost) { this._dragGhost.remove(); this._dragGhost = null; }
+    this._dragCard = null;
+    if (this.state) {
+      this.state.dragPreview    = null;
+      this.state.showValidCells = false;
+      this.state.hovCell        = null;
+    }
+    if (this.hand && this.hand.selected >= 0) {
+      this.hand.selected = -1;
+      this.hand._render();
+    }
+  }
 
   // ── Resize ─────────────────────────────────────────────────
   _resize() {

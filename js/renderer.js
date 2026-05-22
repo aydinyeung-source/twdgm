@@ -1,4 +1,4 @@
-import { CW, CH, HALF_W, PATH_WP, CELL, VALID_CELLS, ENEMY_SPAWN_MS } from './data.js';
+import { CW, CH, HALF_W, PATH_WP, CELL, VALID_CELLS, ENEMY_SPAWN_MS, CARD_DEFS } from './data.js';
 import { clamp } from './engine.js';
 
 // Palette
@@ -80,6 +80,7 @@ export class Renderer {
     this._drawUnits(state.units);
     this._drawProjectiles(state.projectiles);
     particles.draw(ctx);
+    if (state.dragPreview) this._drawDragPreview(state.dragPreview);
     this._drawOverlay(state);
   }
 
@@ -101,6 +102,43 @@ export class Renderer {
     ctx.fillRect(0, 0, HALF_W, CH);
     ctx.fillStyle = 'rgba(239,68,68,0.04)';
     ctx.fillRect(HALF_W, 0, HALF_W, CH);
+  }
+
+  // ── Drag preview ghost (unit silhouette on canvas during drag) ─
+  _drawDragPreview(p) {
+    const { ctx } = this;
+    const style   = UNIT_STYLE[p.defId] ?? { body: p.color, rim: '#fff', shape: 'circle' };
+    const ringColor = p.valid ? '#34d399' : '#ef4444';
+
+    ctx.save();
+
+    if (p.type === 'spell') {
+      // AOE ring for spells
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle   = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.spellRadius ?? 60, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.75;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth   = 2.5;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.spellRadius ?? 60, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      // Unit silhouette
+      ctx.globalAlpha  = p.valid ? 0.72 : 0.35;
+      ctx.shadowBlur   = 22;
+      ctx.shadowColor  = ringColor;
+      ctx.fillStyle    = style.body;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      // Pulsing rim
+      ctx.globalAlpha  = p.valid ? 0.95 : 0.5;
+      ctx.strokeStyle  = ringColor;
+      ctx.lineWidth    = 2.5;
+      ctx.shadowBlur   = 12;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    ctx.restore();
   }
 
   // ── Valid cell highlights (shown when defender card is selected) ─
