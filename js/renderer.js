@@ -1,4 +1,4 @@
-import { CW, CH, HALF_W, PATH_WP, CELL, VALID_CELLS } from './data.js';
+import { CW, CH, HALF_W, PATH_WP, CELL, VALID_CELLS, ENEMY_SPAWN_MS } from './data.js';
 import { clamp } from './engine.js';
 
 // Palette
@@ -320,9 +320,12 @@ export class Renderer {
     const style = UNIT_STYLE[u.defId] ?? { body: u.color, rim: '#fff', shape: 'circle' };
     const flash = u.flashTimer > 0;
     const cloaked = u.cloakTimer > 0;
+    const spawning = u.spawnTimer > 0;
+    const spawnProg = spawning ? Math.max(0, 1 - u.spawnTimer / ENEMY_SPAWN_MS) : 1;
 
     ctx.save();
-    if (cloaked) ctx.globalAlpha = 0.32;
+    if (spawning) ctx.globalAlpha = 0.15 + spawnProg * 0.75;
+    else if (cloaked) ctx.globalAlpha = 0.32;
 
     // Glow
     ctx.shadowBlur  = u.stunTimer > 0 ? 18 : flash ? 22 : 10;
@@ -368,9 +371,28 @@ export class Renderer {
 
     ctx.restore();
 
-    // HP bar (always opaque)
-    const hpColor = u.owner === 'ply' ? PAL.hpBluePly : PAL.hpRedOpp;
-    _hpBar(ctx, u.x - u.r, u.y - u.r - 9, u.r * 2, 4, u.hp / u.maxHp, hpColor);
+    // Spawn ring: large circle collapses inward as the unit materialises
+    if (spawning) {
+      const t = 1 - spawnProg;           // 1 at spawn → 0 when ready
+      const ringR = u.r * (1 + t * 3.2); // collapses from 4.2× to 1× radius
+      ctx.save();
+      ctx.globalAlpha  = t * 0.9;
+      ctx.shadowBlur   = 20;
+      ctx.shadowColor  = u.glow ?? u.color;
+      ctx.strokeStyle  = u.color;
+      ctx.lineWidth    = 3 + t * 4;
+      ctx.beginPath(); ctx.arc(u.x, u.y, ringR, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha  = t * 0.5;
+      ctx.lineWidth    = 1.5;
+      ctx.beginPath(); ctx.arc(u.x, u.y, ringR * 0.65, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+
+    // HP bar (always opaque, hidden during spawn)
+    if (!spawning) {
+      const hpColor = u.owner === 'ply' ? PAL.hpBluePly : PAL.hpRedOpp;
+      _hpBar(ctx, u.x - u.r, u.y - u.r - 9, u.r * 2, 4, u.hp / u.maxHp, hpColor);
+    }
 
     // Flying indicator (small wing shape above unit)
     if (u.flying) {

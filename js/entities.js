@@ -1,5 +1,5 @@
 import { uid, dist } from './engine.js';
-import { CARD_DEFS, TOWER_DEFS, LANE_LEFT, LANE_RIGHT, TOWER_REGEN_RATE, TOWER_REGEN_DELAY, PATH_WP, HALF_W } from './data.js';
+import { CARD_DEFS, TOWER_DEFS, LANE_LEFT, LANE_RIGHT, TOWER_REGEN_RATE, TOWER_REGEN_DELAY, PATH_WP, HALF_W, ENEMY_SPAWN_MS } from './data.js';
 
 // ── Tower ──────────────────────────────────────────────────
 export class Tower {
@@ -112,6 +112,7 @@ export class Unit {
     this.spdMult   = 1;
 
     this.state     = 'march';
+    this.spawnTimer = this._isEnemy ? ENEMY_SPAWN_MS : 0;
 
     // Path-following fields (set by _spawnUnit before unit is live)
     this._side    = 'left';   // 'left' or 'right' canvas half
@@ -139,6 +140,7 @@ export class Unit {
   update(dt, units, towers) {
     if (this.dead) return null;
     const dtms = dt * 1000;
+    if (this.spawnTimer  > 0) { this.spawnTimer -= dtms; return null; }
     if (this.flashTimer  > 0) this.flashTimer  -= dtms;
     if (this.cloakTimer  > 0) this.cloakTimer  -= dtms;
     if (this.cooldown    > 0) this.cooldown    -= dtms;

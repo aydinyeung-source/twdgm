@@ -72,6 +72,7 @@ export const ELIXIR_START   = 20;
 export const ELIXIR_RATE    = 1.0;
 export const ELIXIR_RATE_OT = 3.0;
 export const HAND_SIZE      = 4;
+export const ENEMY_SPAWN_MS = 1200;  // ms enemies are immobile after spawning
 
 // ── Card level system ──────────────────────────────────────
 // Level 1 is base. Each level adds 10% to hp and dmg.
