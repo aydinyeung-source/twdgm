@@ -594,6 +594,7 @@ input  { font-family: inherit; outline: none; }
   cursor: pointer; position: relative;
   transition: transform 0.15s, box-shadow 0.15s;
   overflow: hidden; user-select: none;
+  touch-action: manipulation;
 }
 .card::before { content: ''; position: absolute; inset: 0; background: var(--card-bg, transparent); opacity: 0.18; }
 .card.type-troop    { border-color: rgba(45,139,204,0.35); }
@@ -612,7 +613,8 @@ input  { font-family: inherit; outline: none; }
 .card.type-building .card-type-badge { background: rgba(148,163,184,0.3); color: #e2e8f0; }
 .card-level-badge { position: absolute; bottom: 24px; right: 4px; font-size: 7px; font-weight: 900; color: var(--yellow-warm); background: rgba(245,197,24,0.15); border: 1px solid rgba(245,197,24,0.4); border-radius: 4px; padding: 1px 3px; z-index: 2; }
 .card-icon { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; z-index: 2; }
-.card-icon canvas { display: block; }
+.card-icon canvas { display: block; pointer-events: none; }
+.cc-icon canvas   { display: block; pointer-events: none; }
 .card-name { font-size: 9px; font-weight: 700; text-align: center; padding: 2px 4px; color: var(--white); letter-spacing: 0.5px; text-transform: uppercase; position: relative; z-index: 2; line-height: 1.2; }
 .card-race { font-size: 7px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--race-color, #888); padding: 0 4px 4px; text-align: center; position: relative; z-index: 2; }
 

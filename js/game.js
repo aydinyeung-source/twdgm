@@ -1179,6 +1179,7 @@ class Game {
       if (target instanceof Tower && !target.dead) {
         const destroyed = target.takeDamage(attacker.dmg);
         if (attacker.owner === 'ply') this._onTowerHit(target, attacker.dmg, destroyed);
+        else if (destroyed && target.id === 'plyKing') this._endGame(false);
         this.particles.burst(target.x, target.y, 5, { color: '#22d3ee', speedLo: 40, speedHi: 120 });
       }
       for (const u of hitSet) {
@@ -1230,7 +1231,12 @@ class Game {
   _applyProjectileHit(proj, target) {
     if (target instanceof Tower) {
       const destroyed = target.takeDamage(proj.dmg);
-      if (proj._attackerOwner === 'ply') this._onTowerHit(target, proj.dmg, destroyed);
+      if (proj._attackerOwner === 'ply') {
+        this._onTowerHit(target, proj.dmg, destroyed);
+      } else if (destroyed) {
+        this.particles.burst(target.x, target.y, 28, { color: '#ef4444', speedLo: 60, speedHi: 260, rLo: 3, rHi: 8 });
+        if (target.id === 'plyKing') this._endGame(false);
+      }
     } else {
       const dmg = target.takeDamage(proj.dmg);
       if (proj._attackerOwner === 'ply') this.state.stats.damage += dmg;

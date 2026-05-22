@@ -57,8 +57,8 @@ export const LANE_RIGHT = 390;
 // ── Tower / base definitions ───────────────────────────────
 // One base per side, positioned at PATH_WP end on each half
 export const TOWER_DEFS = {
-  plyKing: { id: 'plyKing', owner: 'ply', kind: 'king', x: 130,       y: 752, r: 40, hp: 300, dmg: 16, range: 170, rate: 1600 },
-  oppKing: { id: 'oppKing', owner: 'opp', kind: 'king', x: 130+HALF_W, y: 752, r: 40, hp: 300, dmg: 16, range: 170, rate: 1600 },
+  plyKing: { id: 'plyKing', owner: 'ply', kind: 'king', x: 130,       y: 752, r: 40, hp: 2000, dmg: 16, range: 170, rate: 1600 },
+  oppKing: { id: 'oppKing', owner: 'opp', kind: 'king', x: 130+HALF_W, y: 752, r: 40, hp: 2000, dmg: 16, range: 170, rate: 1600 },
 };
 
 // Tower regeneration: regen starts after TOWER_REGEN_DELAY ms of no damage
